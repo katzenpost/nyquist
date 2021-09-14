@@ -37,8 +37,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/oasisprotocol/curve25519-voi/primitives/x25519"
-	"gitlab.com/yawning/x448.git"
+	"github.com/cloudflare/circl/dh/x25519"
+	"github.com/cloudflare/circl/dh/x448"
 )
 
 var (
@@ -126,7 +126,7 @@ func (dh *dh25519) GenerateKeypair(rng io.Reader) (Keypair, error) {
 		return nil, err
 	}
 
-	x25519.ScalarBaseMult(&kp.publicKey.rawPublicKey, &kp.rawPrivateKey)
+	x25519.KeyGen(&kp.publicKey.rawPublicKey, &kp.rawPrivateKey)
 
 	return &kp, nil
 }
@@ -150,12 +150,12 @@ func (dh *dh25519) ParsePublicKey(data []byte) (PublicKey, error) {
 }
 
 func (dh *dh25519) Size() int {
-	return 32
+	return x25519.Size
 }
 
 // Keypair25519 is a X25519 keypair.
 type Keypair25519 struct {
-	rawPrivateKey [32]byte
+	rawPrivateKey x25519.Key
 	publicKey     PublicKey25519
 }
 
@@ -168,12 +168,12 @@ func (kp *Keypair25519) MarshalBinary() ([]byte, error) {
 // UnmarshalBinary unmarshals the keypair's private key from binary form,
 // and re-derives the corresponding public key.
 func (kp *Keypair25519) UnmarshalBinary(data []byte) error {
-	if len(data) != 32 {
+	if len(data) != x25519.Size {
 		return ErrMalformedPrivateKey
 	}
 
 	copy(kp.rawPrivateKey[:], data)
-	x25519.ScalarBaseMult(&kp.publicKey.rawPublicKey, &kp.rawPrivateKey)
+	x25519.KeyGen(&kp.publicKey.rawPublicKey, &kp.rawPrivateKey)
 
 	return nil
 }
@@ -191,8 +191,10 @@ func (kp *Keypair25519) DH(publicKey PublicKey) ([]byte, error) {
 		return nil, ErrMismatchedPublicKey
 	}
 
-	var sharedSecret [32]byte
-	x25519.ScalarMult(&sharedSecret, &kp.rawPrivateKey, &pubKey.rawPublicKey)
+	// Ignore the return value and just return all-zeros when the public
+	// key is low-order, since that is the standard Noise behavior.
+	var sharedSecret x25519.Key
+	_ = x25519.Shared(&sharedSecret, &kp.rawPrivateKey, &pubKey.rawPublicKey)
 
 	return sharedSecret[:], nil
 }
@@ -206,7 +208,7 @@ func (kp *Keypair25519) DropPrivate() {
 
 // PublicKey25519 is a X25519 public key.
 type PublicKey25519 struct {
-	rawPublicKey [32]byte
+	rawPublicKey x25519.Key
 }
 
 // MarshalBinary marshals the public key to binary form.
@@ -217,7 +219,7 @@ func (pk *PublicKey25519) MarshalBinary() ([]byte, error) {
 
 // UnmarshalBinary unmarshals the public key from binary form.
 func (pk *PublicKey25519) UnmarshalBinary(data []byte) error {
-	if len(data) != 32 {
+	if len(data) != x25519.Size {
 		return ErrMalformedPublicKey
 	}
 
@@ -249,7 +251,7 @@ func (dh *dh448) GenerateKeypair(rng io.Reader) (Keypair, error) {
 		return nil, err
 	}
 
-	x448.ScalarBaseMult(&kp.publicKey.rawPublicKey, &kp.rawPrivateKey)
+	x448.KeyGen(&kp.publicKey.rawPublicKey, &kp.rawPrivateKey)
 
 	return &kp, nil
 }
@@ -273,12 +275,12 @@ func (dh *dh448) ParsePublicKey(data []byte) (PublicKey, error) {
 }
 
 func (dh *dh448) Size() int {
-	return 56
+	return x448.Size
 }
 
 // Keypair448 is a X448 keypair.
 type Keypair448 struct {
-	rawPrivateKey [56]byte
+	rawPrivateKey x448.Key
 	publicKey     PublicKey448
 }
 
@@ -291,12 +293,12 @@ func (kp *Keypair448) MarshalBinary() ([]byte, error) {
 // UnmarshalBinary unmarshals the keypair's private key from binary form,
 // and re-derives the corresponding public key.
 func (kp *Keypair448) UnmarshalBinary(data []byte) error {
-	if len(data) != 56 {
+	if len(data) != x448.Size {
 		return ErrMalformedPrivateKey
 	}
 
 	copy(kp.rawPrivateKey[:], data)
-	x448.ScalarBaseMult(&kp.publicKey.rawPublicKey, &kp.rawPrivateKey)
+	x448.KeyGen(&kp.publicKey.rawPublicKey, &kp.rawPrivateKey)
 
 	return nil
 }
@@ -314,8 +316,10 @@ func (kp *Keypair448) DH(publicKey PublicKey) ([]byte, error) {
 		return nil, ErrMismatchedPublicKey
 	}
 
-	var sharedSecret [56]byte
-	x448.ScalarMult(&sharedSecret, &kp.rawPrivateKey, &pubKey.rawPublicKey)
+	// Ignore the return value and just return all-zeros when the public
+	// key is low-order, since that is the standard Noise behavior.
+	var sharedSecret x448.Key
+	_ = x448.Shared(&sharedSecret, &kp.rawPrivateKey, &pubKey.rawPublicKey)
 
 	return sharedSecret[:], nil
 }
@@ -329,7 +333,7 @@ func (kp *Keypair448) DropPrivate() {
 
 // PublicKey448 is a X448 public key.
 type PublicKey448 struct {
-	rawPublicKey [56]byte
+	rawPublicKey x448.Key
 }
 
 // MarshalBinary marshals the public key to binary form.
@@ -340,7 +344,7 @@ func (pk *PublicKey448) MarshalBinary() ([]byte, error) {
 
 // UnmarshalBinary unmarshals the public key from binary form.
 func (pk *PublicKey448) UnmarshalBinary(data []byte) error {
-	if len(data) != 56 {
+	if len(data) != x448.Size {
 		return ErrMalformedPublicKey
 	}
 

@@ -238,7 +238,7 @@ type proxyObserver struct {
 	callbackFn func(pattern.Token, dh.PublicKey) error
 }
 
-func (proxy *proxyObserver) OnPeerPublicKeyDH(token pattern.Token, pk dh.PublicKey) error {
+func (proxy *proxyObserver) OnPeerPublicKey(token pattern.Token, pk dh.PublicKey) error {
 	return proxy.callbackFn(token, pk)
 }
 
@@ -265,7 +265,7 @@ func testHandshakeStateObserver(t *testing.T) {
 			return nil
 		},
 	}
-	bobHs.cfg.Observer = proxy // Yeah this is ugly, but it works.
+	bobHs.cfg.DH.Observer = proxy // Yeah this is ugly, but it works.
 
 	dst, err := aliceHs.WriteMessage(nil, nil)
 	require.Equal(ErrDone, err, "aliceHs.WriteMessage()")

@@ -153,12 +153,12 @@ type HandshakeConfig struct {
 	// DH is the Diffie-Hellman keys for this handshake.
 	DH *DHConfig
 
+	// KEM is the Key Encapsulation Mechanism keys for this handshake.
+	KEM *KEMConfig
+
 	// PreSharedKeys is the vector of pre-shared symmetric key for PSK mode
 	// handshakes.
 	PreSharedKeys [][]byte
-
-	// Observer is the optional handshake observer.
-	Observer HandshakeObserver
 
 	// Rng is the entropy source to be used when entropy is required.
 	// If the value is `nil`, `crypto/rand.Reader` will be used.
@@ -191,6 +191,28 @@ type DHConfig struct {
 
 	// RemoteEphemeral is the remote ephemeral public key, if any (`re`).
 	RemoteEphemeral dh.PublicKey
+
+	// Observer is the optional handshake observer.
+	Observer HandshakeObserverDH
+}
+
+// KEMConfig is the Key Encapsuation Mechanism (KEM) key configuration
+// of a handshake.
+type KEMConfig struct {
+	// LocalStatic is the local static keypair, if any (`s`).
+	LocalStatic kem.Keypair
+
+	// LocalEphemeral is the local ephemeral keypair, if any (`e`).
+	LocalEphemeral kem.Keypair
+
+	// RemoteStatic is the remote static public key, if any (`rs`).
+	RemoteStatic kem.PublicKey
+
+	// RemoteEphemeral is the remote ephemeral public key, if any (`re`).
+	RemoteEphemeral kem.PublicKey
+
+	// Observer is the optional handshake observer.
+	Observer HandshakeObserverKEM
 }
 
 // HandshakeStatus is the status of a handshake.
@@ -207,6 +229,9 @@ type HandshakeStatus struct {
 
 	// DH is the Diffie-Hellman public keys of the handshake.
 	DH *DHStatus
+
+	// KEM is the Key Encapsulation Mechanism public keys of the handshake.
+	KEM *KEMStatus
 
 	// CipherStates is the resulting CipherState pair (`(cs1, cs2)`).
 	//
@@ -230,14 +255,38 @@ type DHStatus struct {
 	RemoteEphemeral dh.PublicKey
 }
 
-// HandshakeObserver is a handshake observer for monitoring handshake status.
-type HandshakeObserver interface {
-	// OnPeerPublicKeyDH will be called when a Diffie-Hellman public key
-	// is received from the peer, with the handshake pattern token
-	// (`pattern.Token_e`, `pattern.Token_s`) and public key.
+// KEMStatus is the Key Encapsulation Mechanism (KEM) status of a handshake.
+type KEMStatus struct {
+	// LocalEphemeral is the local ephemeral public key, if any (`e`).
+	LocalEphemeral kem.PublicKey
+
+	// RemoteStatic is the remote static public key, if any (`rs`).
+	RemoteStatic kem.PublicKey
+
+	// RemoteEphemeral is the remote ephemeral public key, if any (`re`).
+	RemoteEphemeral kem.PublicKey
+}
+
+// HandshakeObserverDH is a handshake observer for monitoring Diffie-Hellman
+// based handshake status.
+type HandshakeObserverDH interface {
+	// OnPeerPublicKey will be called when a public key is received from
+	// the peer, with the handshake pattern token (`pattern.Token_e`,
+	// `pattern.Token_s`) and public key.
 	//
 	// Returning a non-nil error will abort the handshake immediately.
-	OnPeerPublicKeyDH(pattern.Token, dh.PublicKey) error
+	OnPeerPublicKey(pattern.Token, dh.PublicKey) error
+}
+
+// HandshakeObseverKEM is a handshake observer for monitoring Key Encapsulation
+// Mechanism based handshake status.
+type HandshakeObserverKEM interface {
+	// OnPeerPublicKey will be called when a public key is received from
+	// the peer, with the handshake pattern token (`pattern.Token_e`,
+	// `pattern.Token_s`) and public key.
+	//
+	// Returning a non-nil error will abort the handshake immediately.
+	OnPeerPublicKey(pattern.Token, kem.PublicKey) error
 }
 
 func (cfg *HandshakeConfig) getRng() io.Reader {
@@ -263,7 +312,9 @@ type HandshakeState struct {
 
 	patterns []pattern.Message
 
-	dh *dhState
+	dh  *dhState
+	kem *kemState
+
 	ss *SymmetricState
 
 	status *HandshakeStatus
@@ -283,6 +334,18 @@ type dhState struct {
 	re dh.PublicKey
 
 	pkLen int // aka DHLEN
+}
+
+type kemState struct {
+	impl kem.KEM
+
+	s  kem.Keypair
+	e  kem.Keypair
+	rs kem.PublicKey
+	re kem.PublicKey
+
+	pkLen int
+	ctLen int
 }
 
 // SymmetricState returns the HandshakeState's encapsulated SymmetricState.
@@ -320,132 +383,35 @@ func (hs *HandshakeState) Reset() {
 }
 
 func (hs *HandshakeState) onWriteTokenE(dst []byte) []byte {
-	dh := hs.dh
+	if hs.kem != nil {
+		return hs.onWriteTokenE_KEM(dst)
+	}
 
-	// hs.cfg.DH.LocalEphemeral can be used to pre-generate the ephemeral key,
-	// so only generate when required.
-	if dh.e == nil {
-		if dh.e, hs.status.Err = dh.impl.GenerateKeypair(hs.cfg.getRng()); hs.status.Err != nil {
-			return nil
-		}
-	}
-	eBytes := dh.e.Public().Bytes()
-	hs.ss.MixHash(eBytes)
-	if hs.cfg.Protocol.Pattern.NumPSKs() > 0 {
-		hs.ss.MixKey(eBytes)
-	}
-	hs.status.DH.LocalEphemeral = dh.e.Public()
-	return append(dst, eBytes...)
+	return hs.onWriteTokenE_DH(dst)
 }
 
 func (hs *HandshakeState) onReadTokenE(payload []byte) []byte {
-	dh := hs.dh
+	if hs.kem != nil {
+		return hs.onReadTokenE_KEM(payload)
+	}
 
-	dhLen := dh.pkLen
-	if len(payload) < dhLen {
-		hs.status.Err = errTruncatedE
-		return nil
-	}
-	eBytes, tail := payload[:dhLen], payload[dhLen:]
-	if dh.re, hs.status.Err = dh.impl.ParsePublicKey(eBytes); hs.status.Err != nil {
-		return nil
-	}
-	hs.status.DH.RemoteEphemeral = dh.re
-	if hs.cfg.Observer != nil {
-		if hs.status.Err = hs.cfg.Observer.OnPeerPublicKeyDH(pattern.Token_e, dh.re); hs.status.Err != nil {
-			return nil
-		}
-	}
-	hs.ss.MixHash(eBytes)
-	if hs.cfg.Protocol.Pattern.NumPSKs() > 0 {
-		hs.ss.MixKey(eBytes)
-	}
-	return tail
+	return hs.onReadTokenE_DH(payload)
 }
 
 func (hs *HandshakeState) onWriteTokenS(dst []byte) []byte {
-	dh := hs.dh
-
-	if dh.s == nil {
-		hs.status.Err = errMissingS
-		return nil
+	if hs.kem != nil {
+		return hs.onWriteTokenS_KEM(dst)
 	}
-	sBytes := dh.s.Public().Bytes()
-	return hs.ss.EncryptAndHash(dst, sBytes)
+
+	return hs.onWriteTokenS_DH(dst)
 }
 
 func (hs *HandshakeState) onReadTokenS(payload []byte) []byte {
-	dh := hs.dh
+	if hs.kem != nil {
+		return hs.onReadTokenS_KEM(payload)
+	}
 
-	tempLen := dh.pkLen
-	if hs.ss.cs.HasKey() {
-		// The spec says `DHLEN + 16`, but doing it this way allows this
-		// implementation to support any AEAD implementation, regardless of
-		// tag size.
-		tempLen += hs.ss.cs.aead.Overhead()
-	}
-	if len(payload) < tempLen {
-		hs.status.Err = errTruncatedS
-		return nil
-	}
-	temp, tail := payload[:tempLen], payload[tempLen:]
-
-	var sBytes []byte
-	if sBytes, hs.status.Err = hs.ss.DecryptAndHash(nil, temp); hs.status.Err != nil {
-		return nil
-	}
-	if dh.rs, hs.status.Err = dh.impl.ParsePublicKey(sBytes); hs.status.Err != nil {
-		return nil
-	}
-	hs.status.DH.RemoteStatic = dh.rs
-	if hs.cfg.Observer != nil {
-		if hs.status.Err = hs.cfg.Observer.OnPeerPublicKeyDH(pattern.Token_s, dh.rs); hs.status.Err != nil {
-			return nil
-		}
-	}
-	return tail
-}
-
-func (hs *HandshakeState) onTokenEE() {
-	var eeBytes []byte
-	if eeBytes, hs.status.Err = hs.dh.e.DH(hs.dh.re); hs.status.Err != nil {
-		return
-	}
-	hs.ss.MixKey(eeBytes)
-}
-
-func (hs *HandshakeState) onTokenES() {
-	var esBytes []byte
-	if hs.isInitiator {
-		esBytes, hs.status.Err = hs.dh.e.DH(hs.dh.rs)
-	} else {
-		esBytes, hs.status.Err = hs.dh.s.DH(hs.dh.re)
-	}
-	if hs.status.Err != nil {
-		return
-	}
-	hs.ss.MixKey(esBytes)
-}
-
-func (hs *HandshakeState) onTokenSE() {
-	var seBytes []byte
-	if hs.isInitiator {
-		seBytes, hs.status.Err = hs.dh.s.DH(hs.dh.re)
-	} else {
-		seBytes, hs.status.Err = hs.dh.e.DH(hs.dh.rs)
-	}
-	if hs.status.Err != nil {
-		return
-	}
-	hs.ss.MixKey(seBytes)
-}
-
-func (hs *HandshakeState) onTokenSS() {
-	var ssBytes []byte
-	if ssBytes, hs.status.Err = hs.dh.s.DH(hs.dh.rs); hs.status.Err != nil {
-		return
-	}
-	hs.ss.MixKey(ssBytes)
+	return hs.onReadTokenS_DH(payload)
 }
 
 func (hs *HandshakeState) onTokenPsk() {
@@ -591,16 +557,25 @@ func (hs *HandshakeState) handlePreMessages() error {
 	// Gather all the public keys from the config, from the initiator's
 	// point of view.
 	var s, e, rs, re bytesAble
-	if dh := hs.dh; dh != nil {
-		rs, re = dh.rs, dh.re
-		if dh.s != nil {
-			s = dh.s.Public()
+	switch {
+	case hs.kem != nil:
+		rs, re = hs.kem.rs, hs.kem.re
+		if hs.kem.s != nil {
+			s = hs.kem.s.Public()
 		}
-		if dh.e != nil {
-			e = dh.e.Public()
+		if hs.kem.e != nil {
+			e = hs.kem.e.Public()
 		}
-	} else {
-		panic("not implemented")
+	case hs.dh != nil:
+		rs, re = hs.dh.rs, hs.dh.re
+		if hs.dh.s != nil {
+			s = hs.dh.s.Public()
+		}
+		if hs.dh.e != nil {
+			e = hs.dh.e.Public()
+		}
+	default:
+		panic("nyquist: no kex mechanism configured")
 	}
 	if !hs.isInitiator {
 		s, e, rs, re = rs, re, s, e
@@ -674,8 +649,24 @@ func NewHandshake(cfg *HandshakeConfig) (*HandshakeState, error) {
 		isInitiator:    cfg.IsInitiator,
 	}
 	if cfg.Protocol.Pattern.IsKEM() {
-		// TODO: Handle PQConfig
-		panic("not implemented")
+		hs.kem = &kemState{
+			impl:  cfg.Protocol.KEM,
+			pkLen: cfg.Protocol.KEM.PublicKeySize(),
+			ctLen: cfg.Protocol.KEM.CiphertextSize(),
+		}
+		hs.status.KEM = &KEMStatus{}
+		if kemCfg := cfg.KEM; kemCfg != nil {
+			hs.kem.s = kemCfg.LocalStatic
+			hs.kem.e = kemCfg.LocalEphemeral
+			hs.kem.rs = kemCfg.RemoteStatic
+			hs.kem.re = kemCfg.RemoteEphemeral
+			hs.status.KEM.RemoteStatic = kemCfg.RemoteStatic
+			hs.status.KEM.RemoteEphemeral = kemCfg.RemoteEphemeral
+
+			if kemCfg.LocalEphemeral != nil {
+				hs.status.KEM.LocalEphemeral = kemCfg.LocalEphemeral.Public()
+			}
+		}
 	} else {
 		hs.dh = &dhState{
 			impl:  cfg.Protocol.DH,

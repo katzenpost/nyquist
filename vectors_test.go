@@ -264,13 +264,15 @@ func configsFromVector(t *testing.T, v *vectors.Vector, skipOk bool) (*Handshake
 	}
 
 	initCfg := &HandshakeConfig{
-		Protocol:       protocol,
-		Prologue:       v.InitPrologue,
-		LocalStatic:    initStatic,
-		LocalEphemeral: initEphemeral,
-		RemoteStatic:   initRemoteStatic,
-		Rng:            &failReader{},
-		IsInitiator:    true,
+		Protocol: protocol,
+		Prologue: v.InitPrologue,
+		DH: &DHConfig{
+			LocalStatic:    initStatic,
+			LocalEphemeral: initEphemeral,
+			RemoteStatic:   initRemoteStatic,
+		},
+		Rng:         &failReader{},
+		IsInitiator: true,
 	}
 
 	require.Len(v.InitPsks, protocol.Pattern.NumPSKs(), "test vector has the expected number of InitPsks")
@@ -298,13 +300,15 @@ func configsFromVector(t *testing.T, v *vectors.Vector, skipOk bool) (*Handshake
 	}
 
 	respCfg := &HandshakeConfig{
-		Protocol:       protocol,
-		Prologue:       v.RespPrologue,
-		LocalStatic:    respStatic,
-		LocalEphemeral: respEphemeral,
-		RemoteStatic:   respRemoteStatic,
-		Rng:            &failReader{},
-		IsInitiator:    false,
+		Protocol: protocol,
+		Prologue: v.RespPrologue,
+		DH: &DHConfig{
+			LocalStatic:    respStatic,
+			LocalEphemeral: respEphemeral,
+			RemoteStatic:   respRemoteStatic,
+		},
+		Rng:         &failReader{},
+		IsInitiator: false,
 	}
 
 	require.Len(v.RespPsks, protocol.Pattern.NumPSKs(), "test vector has the expected number of RespPsks")

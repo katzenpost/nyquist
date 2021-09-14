@@ -64,9 +64,11 @@ func mustMakeX(t *testing.T, mms int) (*HandshakeState, *HandshakeState) {
 	require.NoError(err, "Generate Bob's static keypair")
 
 	aliceCfg := &HandshakeConfig{
-		Protocol:       protocol,
-		LocalStatic:    aliceStatic,
-		RemoteStatic:   bobStatic.Public(),
+		Protocol: protocol,
+		DH: &DHConfig{
+			LocalStatic:  aliceStatic,
+			RemoteStatic: bobStatic.Public(),
+		},
 		MaxMessageSize: mms,
 		IsInitiator:    true,
 	}
@@ -74,8 +76,10 @@ func mustMakeX(t *testing.T, mms int) (*HandshakeState, *HandshakeState) {
 	require.NoError(err, "NewHandshake(aliceCfg)")
 
 	bobCfg := &HandshakeConfig{
-		Protocol:       protocol,
-		LocalStatic:    bobStatic,
+		Protocol: protocol,
+		DH: &DHConfig{
+			LocalStatic: bobStatic,
+		},
 		MaxMessageSize: mms,
 	}
 	bobHs, err := NewHandshake(bobCfg)
@@ -126,10 +130,12 @@ func testHandshakeStateKeygenFailure(t *testing.T) {
 	require.NoError(err, "Generate Bob's static keypair")
 
 	aliceCfg := &HandshakeConfig{
-		Protocol:     protocol,
-		RemoteStatic: bobStatic.Public(),
-		Rng:          &failReader{},
-		IsInitiator:  true,
+		Protocol: protocol,
+		DH: &DHConfig{
+			RemoteStatic: bobStatic.Public(),
+		},
+		Rng:         &failReader{},
+		IsInitiator: true,
 	}
 	aliceHs, err := NewHandshake(aliceCfg)
 	require.NoError(err, "NewHandshake(aliceCfg)")
@@ -232,7 +238,7 @@ type proxyObserver struct {
 	callbackFn func(pattern.Token, dh.PublicKey) error
 }
 
-func (proxy *proxyObserver) OnPeerPublicKey(token pattern.Token, pk dh.PublicKey) error {
+func (proxy *proxyObserver) OnPeerPublicKeyDH(token pattern.Token, pk dh.PublicKey) error {
 	return proxy.callbackFn(token, pk)
 }
 
@@ -247,11 +253,11 @@ func testHandshakeStateObserver(t *testing.T) {
 			switch token {
 			case pattern.Token_e:
 				require.False(seenE)
-				require.Equal(pk.Bytes(), aliceHs.GetStatus().LocalEphemeral.Bytes())
+				require.Equal(pk.Bytes(), aliceHs.GetStatus().DH.LocalEphemeral.Bytes())
 				seenE = true
 			case pattern.Token_s:
 				require.False(seenS)
-				require.Equal(pk.Bytes(), aliceHs.cfg.LocalStatic.Public().Bytes())
+				require.Equal(pk.Bytes(), aliceHs.cfg.DH.LocalStatic.Public().Bytes())
 				seenS = true
 			default:
 				panic("unknown token: " + token.String())
@@ -308,7 +314,7 @@ func testHandshakeStateMissingS(t *testing.T) {
 	require.EqualError(err, "nyquist/New: responder s not set", "NewHandshake() - missing s")
 
 	aliceHs, _ := mustMakeX(t, 0)
-	aliceHs.s = nil // Not the best way to do this, but this also works.
+	aliceHs.dh.s = nil // Not the best way to do this, but this also works.
 	dst, err := aliceHs.WriteMessage(nil, nil)
 	require.Equal(errMissingS, err, "aliceHs.WriteMessage()")
 	require.Nil(dst, "aliceHs.WriteMessage()")

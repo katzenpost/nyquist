@@ -61,16 +61,20 @@ func TestExample(t *testing.T) {
 	aliceStatic, err := protocol.DH.GenerateKeypair(rand.Reader)
 	require.NoError(err, "Generate Alice's static keypair")
 	aliceCfg := &HandshakeConfig{
-		Protocol:    protocol,
-		LocalStatic: aliceStatic,
+		Protocol: protocol,
+		DH: &DHConfig{
+			LocalStatic: aliceStatic,
+		},
 		IsInitiator: true,
 	}
 
 	bobStatic, err := protocol.DH.GenerateKeypair(rand.Reader)
 	require.NoError(err, "Generate Bob's static keypair")
 	bobCfg := &HandshakeConfig{
-		Protocol:    protocol,
-		LocalStatic: bobStatic,
+		Protocol: protocol,
+		DH: &DHConfig{
+			LocalStatic: bobStatic,
+		},
 		IsInitiator: false,
 	}
 
@@ -122,10 +126,10 @@ func TestExample(t *testing.T) {
 	bobStatus := bobHs.GetStatus()
 
 	require.Equal(aliceStatus.HandshakeHash, bobStatus.HandshakeHash, "Handshake hashes match")
-	require.Equal(aliceStatus.LocalEphemeral.Bytes(), bobStatus.RemoteEphemeral.Bytes())
-	require.Equal(bobStatus.LocalEphemeral.Bytes(), aliceStatus.RemoteEphemeral.Bytes())
-	require.Equal(aliceStatus.RemoteStatic.Bytes(), bobStatic.Public().Bytes())
-	require.Equal(bobStatus.RemoteStatic.Bytes(), aliceStatic.Public().Bytes())
+	require.Equal(aliceStatus.DH.LocalEphemeral.Bytes(), bobStatus.DH.RemoteEphemeral.Bytes())
+	require.Equal(bobStatus.DH.LocalEphemeral.Bytes(), aliceStatus.DH.RemoteEphemeral.Bytes())
+	require.Equal(aliceStatus.DH.RemoteStatic.Bytes(), bobStatic.Public().Bytes())
+	require.Equal(bobStatus.DH.RemoteStatic.Bytes(), aliceStatic.Public().Bytes())
 
 	// Then the CipherState objects can be used to exchange messages.
 	aliceTx, aliceRx := aliceStatus.CipherStates[0], aliceStatus.CipherStates[1]

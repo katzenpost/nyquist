@@ -39,6 +39,7 @@ import (
 	"gitlab.com/yawning/nyquist.git/cipher"
 	"gitlab.com/yawning/nyquist.git/dh"
 	"gitlab.com/yawning/nyquist.git/hash"
+	"gitlab.com/yawning/nyquist.git/kem"
 	"gitlab.com/yawning/nyquist.git/pattern"
 )
 
@@ -66,21 +67,36 @@ var (
 type Protocol struct {
 	Pattern pattern.Pattern
 
-	DH     dh.DH
+	DH  dh.DH
+	KEM kem.KEM
+
 	Cipher cipher.Cipher
 	Hash   hash.Hash
 }
 
 // String returns the string representation of the protocol name.
 func (pr *Protocol) String() string {
-	if pr.Pattern == nil || pr.DH == nil || pr.Cipher == nil || pr.Hash == nil {
+	if pr.Pattern == nil || pr.Cipher == nil || pr.Hash == nil {
 		return invalidProtocol
+	}
+
+	var kexStr string
+	if pr.Pattern.IsKEM() {
+		if pr.KEM == nil || pr.DH != nil {
+			return invalidProtocol
+		}
+		kexStr = pr.KEM.String()
+	} else {
+		if pr.KEM != nil || pr.DH == nil {
+			return invalidProtocol
+		}
+		kexStr = pr.DH.String()
 	}
 
 	parts := []string{
 		protocolPrefix,
 		pr.Pattern.String(),
-		pr.DH.String(),
+		kexStr,
 		pr.Cipher.String(),
 		pr.Hash.String(),
 	}
@@ -101,12 +117,17 @@ func NewProtocol(s string) (*Protocol, error) {
 	}
 
 	var pr Protocol
-	pr.Pattern = pattern.FromString(parts[1])
-	pr.DH = dh.FromString(parts[2])
+	if pr.Pattern = pattern.FromString(parts[1]); pr.Pattern != nil {
+		if pr.Pattern.IsKEM() {
+			pr.KEM = kem.FromString(parts[2])
+		} else {
+			pr.DH = dh.FromString(parts[2])
+		}
+	}
 	pr.Cipher = cipher.FromString(parts[3])
 	pr.Hash = hash.FromString(parts[4])
 
-	if pr.Pattern == nil || pr.DH == nil || pr.Cipher == nil || pr.Hash == nil {
+	if pr.Pattern == nil || (pr.DH == nil && pr.KEM == nil) || pr.Cipher == nil || pr.Hash == nil {
 		return nil, ErrProtocolNotSupported
 	}
 
@@ -129,17 +150,8 @@ type HandshakeConfig struct {
 	// in the handshake hash.
 	Prologue []byte
 
-	// LocalStatic is the local static keypair, if any (`s`).
-	LocalStatic dh.Keypair
-
-	// LocalEphemeral is the local ephemeral keypair, if any (`e`).
-	LocalEphemeral dh.Keypair
-
-	// RemoteStatic is the remote static public key, if any (`rs`).
-	RemoteStatic dh.PublicKey
-
-	// RemoteEphemeral is the remote ephemeral public key, if any (`re`).
-	RemoteEphemeral dh.PublicKey
+	// DH is the Diffie-Hellman keys for this handshake.
+	DH *DHConfig
 
 	// PreSharedKeys is the vector of pre-shared symmetric key for PSK mode
 	// handshakes.
@@ -148,7 +160,7 @@ type HandshakeConfig struct {
 	// Observer is the optional handshake observer.
 	Observer HandshakeObserver
 
-	// Rng is the entropy source to be used when generating new DH key pairs.
+	// Rng is the entropy source to be used when entropy is required.
 	// If the value is `nil`, `crypto/rand.Reader` will be used.
 	Rng io.Reader
 
@@ -166,6 +178,21 @@ type HandshakeConfig struct {
 	IsInitiator bool
 }
 
+// DHConfig is the Diffie-Hellman (DH) key configuration of a handshake.
+type DHConfig struct {
+	// LocalStatic is the local static keypair, if any (`s`).
+	LocalStatic dh.Keypair
+
+	// LocalEphemeral is the local ephemeral keypair, if any (`e`).
+	LocalEphemeral dh.Keypair
+
+	// RemoteStatic is the remote static public key, if any (`rs`).
+	RemoteStatic dh.PublicKey
+
+	// RemoteEphemeral is the remote ephemeral public key, if any (`re`).
+	RemoteEphemeral dh.PublicKey
+}
+
 // HandshakeStatus is the status of a handshake.
 //
 // Warning: It is the caller's responsibility to sanitize the CipherStates
@@ -178,14 +205,8 @@ type HandshakeStatus struct {
 	// handshake is complete, and any other error if the handshake has failed.
 	Err error
 
-	// LocalEphemeral is the local ephemeral public key, if any (`e`).
-	LocalEphemeral dh.PublicKey
-
-	// RemoteStatic is the remote static public key, if any (`rs`).
-	RemoteStatic dh.PublicKey
-
-	// RemoteEphemeral is the remote ephemeral public key, if any (`re`).
-	RemoteEphemeral dh.PublicKey
+	// DH is the Diffie-Hellman public keys of the handshake.
+	DH *DHStatus
 
 	// CipherStates is the resulting CipherState pair (`(cs1, cs2)`).
 	//
@@ -197,14 +218,26 @@ type HandshakeStatus struct {
 	HandshakeHash []byte
 }
 
+// DHStatus is the Diffie-Hellman (DH) status of a handshake.
+type DHStatus struct {
+	// LocalEphemeral is the local ephemeral public key, if any (`e`).
+	LocalEphemeral dh.PublicKey
+
+	// RemoteStatic is the remote static public key, if any (`rs`).
+	RemoteStatic dh.PublicKey
+
+	// RemoteEphemeral is the remote ephemeral public key, if any (`re`).
+	RemoteEphemeral dh.PublicKey
+}
+
 // HandshakeObserver is a handshake observer for monitoring handshake status.
 type HandshakeObserver interface {
-	// OnPeerPublicKey will be called when a public key is received from
-	// the peer, with the handshake pattern token (`pattern.Token_e`,
-	// `pattern.Token_s`) and public key.
+	// OnPeerPublicKeyDH will be called when a Diffie-Hellman public key
+	// is received from the peer, with the handshake pattern token
+	// (`pattern.Token_e`, `pattern.Token_s`) and public key.
 	//
 	// Returning a non-nil error will abort the handshake immediately.
-	OnPeerPublicKey(pattern.Token, dh.PublicKey) error
+	OnPeerPublicKeyDH(pattern.Token, dh.PublicKey) error
 }
 
 func (cfg *HandshakeConfig) getRng() io.Reader {
@@ -228,23 +261,28 @@ func (cfg *HandshakeConfig) getMaxMessageSize() int {
 type HandshakeState struct {
 	cfg *HandshakeConfig
 
-	dh       dh.DH
 	patterns []pattern.Message
 
+	dh *dhState
 	ss *SymmetricState
-
-	s  dh.Keypair
-	e  dh.Keypair
-	rs dh.PublicKey
-	re dh.PublicKey
 
 	status *HandshakeStatus
 
 	patternIndex   int
 	pskIndex       int
 	maxMessageSize int
-	dhLen          int
 	isInitiator    bool
+}
+
+type dhState struct {
+	impl dh.DH
+
+	s  dh.Keypair
+	e  dh.Keypair
+	rs dh.PublicKey
+	re dh.PublicKey
+
+	pkLen int // aka DHLEN
 }
 
 // SymmetricState returns the HandshakeState's encapsulated SymmetricState.
@@ -268,46 +306,53 @@ func (hs *HandshakeState) Reset() {
 		hs.ss.Reset()
 		hs.ss = nil
 	}
-	if hs.s != nil && hs.s != hs.cfg.LocalStatic {
-		// Having a local static key, that isn't from the config currently can't
-		// happen, but this is harmless.
-		hs.s.DropPrivate()
-	}
-	if hs.e != nil && hs.e != hs.cfg.LocalEphemeral {
-		hs.e.DropPrivate()
+	if hs.cfg.DH != nil && hs.dh != nil {
+		if hs.dh.s != nil && hs.dh.s != hs.cfg.DH.LocalStatic {
+			// Having a local static key, that isn't from the config currently can't
+			// happen, but this is harmless.
+			hs.dh.s.DropPrivate()
+		}
+		if hs.dh.e != nil && hs.dh.e != hs.cfg.DH.LocalEphemeral {
+			hs.dh.e.DropPrivate()
+		}
 	}
 	// TODO: Should this set hs.status.Err?
 }
 
 func (hs *HandshakeState) onWriteTokenE(dst []byte) []byte {
-	// hs.cfg.LocalEphemeral can be used to pre-generate the ephemeral key,
+	dh := hs.dh
+
+	// hs.cfg.DH.LocalEphemeral can be used to pre-generate the ephemeral key,
 	// so only generate when required.
-	if hs.e == nil {
-		if hs.e, hs.status.Err = hs.dh.GenerateKeypair(hs.cfg.getRng()); hs.status.Err != nil {
+	if dh.e == nil {
+		if dh.e, hs.status.Err = dh.impl.GenerateKeypair(hs.cfg.getRng()); hs.status.Err != nil {
 			return nil
 		}
 	}
-	eBytes := hs.e.Public().Bytes()
+	eBytes := dh.e.Public().Bytes()
 	hs.ss.MixHash(eBytes)
 	if hs.cfg.Protocol.Pattern.NumPSKs() > 0 {
 		hs.ss.MixKey(eBytes)
 	}
-	hs.status.LocalEphemeral = hs.e.Public()
+	hs.status.DH.LocalEphemeral = dh.e.Public()
 	return append(dst, eBytes...)
 }
 
 func (hs *HandshakeState) onReadTokenE(payload []byte) []byte {
-	if len(payload) < hs.dhLen {
+	dh := hs.dh
+
+	dhLen := dh.pkLen
+	if len(payload) < dhLen {
 		hs.status.Err = errTruncatedE
 		return nil
 	}
-	eBytes, tail := payload[:hs.dhLen], payload[hs.dhLen:]
-	if hs.re, hs.status.Err = hs.dh.ParsePublicKey(eBytes); hs.status.Err != nil {
+	eBytes, tail := payload[:dhLen], payload[dhLen:]
+	if dh.re, hs.status.Err = dh.impl.ParsePublicKey(eBytes); hs.status.Err != nil {
 		return nil
 	}
-	hs.status.RemoteEphemeral = hs.re
+	hs.status.DH.RemoteEphemeral = dh.re
 	if hs.cfg.Observer != nil {
-		if hs.status.Err = hs.cfg.Observer.OnPeerPublicKey(pattern.Token_e, hs.re); hs.status.Err != nil {
+		if hs.status.Err = hs.cfg.Observer.OnPeerPublicKeyDH(pattern.Token_e, dh.re); hs.status.Err != nil {
 			return nil
 		}
 	}
@@ -319,16 +364,20 @@ func (hs *HandshakeState) onReadTokenE(payload []byte) []byte {
 }
 
 func (hs *HandshakeState) onWriteTokenS(dst []byte) []byte {
-	if hs.s == nil {
+	dh := hs.dh
+
+	if dh.s == nil {
 		hs.status.Err = errMissingS
 		return nil
 	}
-	sBytes := hs.s.Public().Bytes()
+	sBytes := dh.s.Public().Bytes()
 	return hs.ss.EncryptAndHash(dst, sBytes)
 }
 
 func (hs *HandshakeState) onReadTokenS(payload []byte) []byte {
-	tempLen := hs.dhLen
+	dh := hs.dh
+
+	tempLen := dh.pkLen
 	if hs.ss.cs.HasKey() {
 		// The spec says `DHLEN + 16`, but doing it this way allows this
 		// implementation to support any AEAD implementation, regardless of
@@ -345,12 +394,12 @@ func (hs *HandshakeState) onReadTokenS(payload []byte) []byte {
 	if sBytes, hs.status.Err = hs.ss.DecryptAndHash(nil, temp); hs.status.Err != nil {
 		return nil
 	}
-	if hs.rs, hs.status.Err = hs.dh.ParsePublicKey(sBytes); hs.status.Err != nil {
+	if dh.rs, hs.status.Err = dh.impl.ParsePublicKey(sBytes); hs.status.Err != nil {
 		return nil
 	}
-	hs.status.RemoteStatic = hs.rs
+	hs.status.DH.RemoteStatic = dh.rs
 	if hs.cfg.Observer != nil {
-		if hs.status.Err = hs.cfg.Observer.OnPeerPublicKey(pattern.Token_s, hs.rs); hs.status.Err != nil {
+		if hs.status.Err = hs.cfg.Observer.OnPeerPublicKeyDH(pattern.Token_s, dh.rs); hs.status.Err != nil {
 			return nil
 		}
 	}
@@ -359,7 +408,7 @@ func (hs *HandshakeState) onReadTokenS(payload []byte) []byte {
 
 func (hs *HandshakeState) onTokenEE() {
 	var eeBytes []byte
-	if eeBytes, hs.status.Err = hs.e.DH(hs.re); hs.status.Err != nil {
+	if eeBytes, hs.status.Err = hs.dh.e.DH(hs.dh.re); hs.status.Err != nil {
 		return
 	}
 	hs.ss.MixKey(eeBytes)
@@ -368,9 +417,9 @@ func (hs *HandshakeState) onTokenEE() {
 func (hs *HandshakeState) onTokenES() {
 	var esBytes []byte
 	if hs.isInitiator {
-		esBytes, hs.status.Err = hs.e.DH(hs.rs)
+		esBytes, hs.status.Err = hs.dh.e.DH(hs.dh.rs)
 	} else {
-		esBytes, hs.status.Err = hs.s.DH(hs.re)
+		esBytes, hs.status.Err = hs.dh.s.DH(hs.dh.re)
 	}
 	if hs.status.Err != nil {
 		return
@@ -381,9 +430,9 @@ func (hs *HandshakeState) onTokenES() {
 func (hs *HandshakeState) onTokenSE() {
 	var seBytes []byte
 	if hs.isInitiator {
-		seBytes, hs.status.Err = hs.s.DH(hs.re)
+		seBytes, hs.status.Err = hs.dh.s.DH(hs.dh.re)
 	} else {
-		seBytes, hs.status.Err = hs.e.DH(hs.rs)
+		seBytes, hs.status.Err = hs.dh.e.DH(hs.dh.rs)
 	}
 	if hs.status.Err != nil {
 		return
@@ -393,7 +442,7 @@ func (hs *HandshakeState) onTokenSE() {
 
 func (hs *HandshakeState) onTokenSS() {
 	var ssBytes []byte
-	if ssBytes, hs.status.Err = hs.s.DH(hs.rs); hs.status.Err != nil {
+	if ssBytes, hs.status.Err = hs.dh.s.DH(hs.dh.rs); hs.status.Err != nil {
 		return
 	}
 	hs.ss.MixKey(ssBytes)
@@ -529,6 +578,10 @@ func (hs *HandshakeState) ReadMessage(dst, payload []byte) ([]byte, error) {
 	return hs.onDone(dst)
 }
 
+type bytesAble interface {
+	Bytes() []byte
+}
+
 func (hs *HandshakeState) handlePreMessages() error {
 	preMessages := hs.cfg.Protocol.Pattern.PreMessages()
 	if len(preMessages) == 0 {
@@ -537,20 +590,24 @@ func (hs *HandshakeState) handlePreMessages() error {
 
 	// Gather all the public keys from the config, from the initiator's
 	// point of view.
-	var s, e, rs, re dh.PublicKey
-	rs, re = hs.rs, hs.re
-	if hs.s != nil {
-		s = hs.s.Public()
-	}
-	if hs.e != nil {
-		e = hs.e.Public()
+	var s, e, rs, re bytesAble
+	if dh := hs.dh; dh != nil {
+		rs, re = dh.rs, dh.re
+		if dh.s != nil {
+			s = dh.s.Public()
+		}
+		if dh.e != nil {
+			e = dh.e.Public()
+		}
+	} else {
+		panic("not implemented")
 	}
 	if !hs.isInitiator {
 		s, e, rs, re = rs, re, s, e
 	}
 
 	for i, keys := range []struct {
-		s, e dh.PublicKey
+		s, e bytesAble
 		side string
 	}{
 		{s, e, "initiator"},
@@ -609,24 +666,34 @@ func NewHandshake(cfg *HandshakeConfig) (*HandshakeState, error) {
 
 	maxMessageSize := cfg.getMaxMessageSize()
 	hs := &HandshakeState{
-		cfg:      cfg,
-		dh:       cfg.Protocol.DH,
-		patterns: cfg.Protocol.Pattern.Messages(),
-		ss:       newSymmetricState(cfg.Protocol.Cipher, cfg.Protocol.Hash, maxMessageSize),
-		s:        cfg.LocalStatic,
-		e:        cfg.LocalEphemeral,
-		rs:       cfg.RemoteStatic,
-		re:       cfg.RemoteEphemeral,
-		status: &HandshakeStatus{
-			RemoteStatic:    cfg.RemoteStatic,
-			RemoteEphemeral: cfg.RemoteEphemeral,
-		},
+		cfg:            cfg,
+		patterns:       cfg.Protocol.Pattern.Messages(),
+		ss:             newSymmetricState(cfg.Protocol.Cipher, cfg.Protocol.Hash, maxMessageSize),
+		status:         &HandshakeStatus{},
 		maxMessageSize: maxMessageSize,
-		dhLen:          cfg.Protocol.DH.Size(),
 		isInitiator:    cfg.IsInitiator,
 	}
-	if cfg.LocalEphemeral != nil {
-		hs.status.LocalEphemeral = cfg.LocalEphemeral.Public()
+	if cfg.Protocol.Pattern.IsKEM() {
+		// TODO: Handle PQConfig
+		panic("not implemented")
+	} else {
+		hs.dh = &dhState{
+			impl:  cfg.Protocol.DH,
+			pkLen: cfg.Protocol.DH.Size(),
+		}
+		hs.status.DH = &DHStatus{}
+		if dhCfg := cfg.DH; dhCfg != nil {
+			hs.dh.s = dhCfg.LocalStatic
+			hs.dh.e = dhCfg.LocalEphemeral
+			hs.dh.rs = dhCfg.RemoteStatic
+			hs.dh.re = dhCfg.RemoteEphemeral
+			hs.status.DH.RemoteStatic = dhCfg.RemoteStatic
+			hs.status.DH.RemoteEphemeral = dhCfg.RemoteEphemeral
+
+			if dhCfg.LocalEphemeral != nil {
+				hs.status.DH.LocalEphemeral = dhCfg.LocalEphemeral.Public()
+			}
+		}
 	}
 
 	hs.ss.InitializeSymmetric([]byte(cfg.Protocol.String()))

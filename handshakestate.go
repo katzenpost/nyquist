@@ -471,6 +471,10 @@ func (hs *HandshakeState) WriteMessage(dst, payload []byte) ([]byte, error) {
 			hs.onTokenSE()
 		case pattern.Token_ss:
 			hs.onTokenSS()
+		case pattern.Token_ekem:
+			dst = hs.onWriteTokenEkem(dst)
+		case pattern.Token_skem:
+			dst = hs.onWriteTokenSkem(dst)
 		case pattern.Token_psk:
 			hs.onTokenPsk()
 		default:
@@ -525,6 +529,10 @@ func (hs *HandshakeState) ReadMessage(dst, payload []byte) ([]byte, error) {
 			hs.onTokenSE()
 		case pattern.Token_ss:
 			hs.onTokenSS()
+		case pattern.Token_ekem:
+			payload = hs.onReadTokenEkem(payload)
+		case pattern.Token_skem:
+			payload = hs.onReadTokenSkem(payload)
 		case pattern.Token_psk:
 			hs.onTokenPsk()
 		default:

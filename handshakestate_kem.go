@@ -29,7 +29,19 @@
 
 package nyquist
 
-import "gitlab.com/yawning/nyquist.git/pattern"
+import (
+	"errors"
+
+	"gitlab.com/yawning/nyquist.git/pattern"
+)
+
+var (
+	errTruncatedEkem = errors.New("nyquist/HandshakeState/ReadMessage/ekem: truncated message")
+	errTruncatedSkem = errors.New("nyquist/HandshakeState/ReadMessage/skem: truncated message")
+
+	errMissingRe = errors.New("nyquist/HandshakeState/WriteMessage/ekem: re not set")
+	errMissingRs = errors.New("nyquist/HandshakeState/WriteMessage/skem: rs not set")
+)
 
 func (hs *HandshakeState) onWriteTokenE_KEM(dst []byte) []byte {
 	// hs.cfg.KEM.LocalEphemeral can be used to pre-generate the ephemeral key,
@@ -110,4 +122,109 @@ func (hs *HandshakeState) onReadTokenS_KEM(payload []byte) []byte {
 		}
 	}
 	return tail
+}
+
+func (hs *HandshakeState) onReadTokenEkem(payload []byte) []byte {
+	ctLen := hs.kem.ctLen
+	if len(payload) < ctLen {
+		hs.status.Err = errTruncatedEkem
+		return nil
+	}
+	ctBytes, tail := payload[:ctLen], payload[ctLen:]
+
+	hs.ss.MixHash(ctBytes)
+
+	k, err := hs.kem.e.Dec(ctBytes)
+	if err != nil {
+		hs.status.Err = err
+		return nil
+	}
+
+	hs.ss.MixKey(k)
+
+	return tail
+}
+
+func (hs *HandshakeState) onWriteTokenEkem(dst []byte) []byte {
+	// Invariant(?) - should have peer e
+	if hs.kem.re == nil {
+		// Invariant violation, missing peer e.
+		hs.status.Err = errMissingRe
+		return nil
+	}
+
+	// E(e):
+	// 1. $ct, k_j \gets INDCPAKEM.Encap(pk;r_i)$
+	ct, k, err := hs.kem.impl.Enc(hs.cfg.getRng(), hs.kem.re)
+	if err != nil {
+		hs.status.Err = err
+		return nil
+	}
+	// 2. $i \gets i +1$
+	// 3. $h \gets H(h\|ct)$
+	hs.ss.MixHash(ct)
+	// 4. $j \gets j +1$, $n \gets 0$
+	// 5. $buf \gets buf \| ct$
+	hs.ss.MixKey(k) // XXX: Instead of setting k_j, this does a MixKey
+
+	return append(dst, ct...)
+}
+
+func (hs *HandshakeState) onReadTokenSkem(payload []byte) []byte {
+	tempLen := hs.kem.ctLen
+	if hs.ss.cs.HasKey() {
+		// The spec would say `CTLEN + 16`, but doing it this way allows this
+		// implementation to support any AEAD implementation, regardless of
+		// tag size.
+		tempLen += hs.ss.cs.aead.Overhead()
+	}
+	if len(payload) < tempLen {
+		hs.status.Err = errTruncatedSkem
+		return nil
+	}
+	temp, tail := payload[:tempLen], payload[tempLen:]
+
+	var ctBytes []byte
+	if ctBytes, hs.status.Err = hs.ss.DecryptAndHash(nil, temp); hs.status.Err != nil {
+		return nil
+	}
+
+	k, err := hs.kem.s.Dec(ctBytes)
+	if err != nil {
+		hs.status.Err = err
+		return nil
+	}
+
+	hs.ss.MixKeyAndHash(k)
+
+	return tail
+}
+
+func (hs *HandshakeState) onWriteTokenSkem(dst []byte) []byte {
+	// E(s):
+	// 1. if $pk$ from partner available
+	if hs.kem.rs == nil {
+		// Invariant violation, missing peer s.
+		hs.status.Err = errMissingRs
+		return nil
+	}
+
+	//    1. $ct, k \gets INDCCAKEM.Encap(pk;r_i)$
+	ct, k, err := hs.kem.impl.Enc(hs.cfg.getRng(), hs.kem.rs)
+	if err != nil {
+		hs.status.Err = err
+		return nil
+	}
+	//    2. $i \gets i +1$
+	//    3. $ct \gets AEAD.Enc(k_j, n, h, ct)$
+	//    4. $buf \gets ct$
+	//    5. $n \gets n+1$
+	//    6. $h \gets H(h\|ct)$
+	ret := hs.ss.EncryptAndHash(dst, ct)
+	//    7. $ck_j, k_j \gets KDF(ck_{j-1},k,2)$
+	//    8. $j \gets j +1$, $n \gets 0$
+	//    9. $buf \gets buf \| ct$
+	hs.ss.MixKeyAndHash(k)
+
+	return ret
 }

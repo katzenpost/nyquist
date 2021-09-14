@@ -38,7 +38,8 @@ import (
 // validity rules, and implementation limitations.
 //
 // Warning: This is not particularly fast, and should only be called when
-// validating custom patterns, or testing.
+// validating custom patterns, or testing.  KEM pattern validation is not
+// fully supported yet.
 func IsValid(pa Pattern) error {
 	initTokens := make(map[Token]bool)
 	respTokens := make(map[Token]bool)
@@ -81,6 +82,8 @@ func IsValid(pa Pattern) error {
 		}
 	}
 
+	isKEM := pa.IsKEM()
+
 	// Validate the messages.
 	messages := pa.Messages()
 	if len(messages) == 0 {
@@ -89,7 +92,7 @@ func IsValid(pa Pattern) error {
 	if pa.IsOneWay() && len(messages) != 1 {
 		return errors.New("nyquist/pattern: excessive messages for one-way pattern")
 	}
-	var numDHs, numPSKs int
+	var numDHs, numPSKs, numKEMs int
 	for i, msg := range messages {
 		m, isInitiator, side := getSide(i)
 		for _, v := range msg {
@@ -101,12 +104,22 @@ func IsValid(pa Pattern) error {
 					return fmt.Errorf("nyquist/pattern: redundant public key (%s): %s", side, v)
 				}
 			case Token_ee, Token_es, Token_se, Token_ss:
+				if isKEM {
+					return fmt.Errorf("nyquist/pattern: DH token in KEM pattern: %s", v)
+				}
+
 				// 3. Parties must not perform a DH calculation more than once
 				// per handshake.
 				if inEither(v) {
 					return fmt.Errorf("nyquist/pattern: redundant DH calcuation: %s", v)
 				}
 				numDHs++
+			case Token_ekem, Token_skem:
+				if !isKEM {
+					return fmt.Errorf("nyquist/pattern: KEM token in DH pattern: %s", v)
+				}
+				// TODO: KEM version of tracking if this is duplicated.
+				numKEMs++
 			case Token_psk:
 				numPSKs++
 			default:
@@ -115,6 +128,8 @@ func IsValid(pa Pattern) error {
 
 			// 1. Parties can only perform DH between private keys and public
 			// keys they posess.
+			//
+			// TODO: KEM version of this rule.
 			var impossibleDH Token
 			switch v {
 			case Token_ee:
@@ -146,6 +161,8 @@ func IsValid(pa Pattern) error {
 		// or ephemeral) and the local static key, the local party must not
 		// call ENCRYPT() unless it has also performed a DH between its local
 		// ephemeral key and the remote public key.
+		//
+		// TODO: KEM version of this rule.
 		var missingDH Token
 		if isInitiator {
 			if inEither(Token_se) && !inEither(Token_ee) {
@@ -176,10 +193,10 @@ func IsValid(pa Pattern) error {
 		}
 	}
 
-	// Patterns without any DH calculations may be "valid", but are
+	// Patterns without any DH/KEM calculations may be "valid", but are
 	// nonsensical.
-	if numDHs == 0 {
-		return errors.New("nyquist/pattern: no DH calculations at all")
+	if numDHs == 0 && numKEMs == 0 {
+		return errors.New("nyquist/pattern: no DH/KEM calculations at all")
 	}
 
 	// Make sure the PSK hint interface function is implemented correctly.

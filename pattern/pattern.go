@@ -42,10 +42,17 @@ const (
 	Token_invalid Token = iota
 	Token_e
 	Token_s
+
+	// DH
 	Token_ee
 	Token_es
 	Token_se
 	Token_ss
+
+	// KEM
+	Token_ekem
+	Token_skem
+
 	Token_psk
 )
 
@@ -64,6 +71,10 @@ func (t Token) String() string {
 		return "se"
 	case Token_ss:
 		return "ss"
+	case Token_ekem:
+		return "ekem"
+	case Token_skem:
+		return "skem"
 	case Token_psk:
 		return "psk"
 	default:
@@ -89,6 +100,9 @@ type Pattern interface {
 
 	// IsOneWay returns true iff the pattern is one-way.
 	IsOneWay() bool
+
+	// IsKEM returns true iff the pattern uses a KEM for key exchanges.
+	IsKEM() bool
 }
 
 // FromString returns a Pattern by pattern name, or nil.
@@ -102,6 +116,7 @@ type builtIn struct {
 	messages    []Message
 	numPSKs     int
 	isOneWay    bool
+	isKEM       bool
 }
 
 func (pa *builtIn) String() string {
@@ -122,6 +137,10 @@ func (pa *builtIn) NumPSKs() int {
 
 func (pa *builtIn) IsOneWay() bool {
 	return pa.isOneWay
+}
+
+func (pa *builtIn) IsKEM() bool {
+	return pa.isKEM
 }
 
 // Register registers a new pattern for use with `FromString()`.
@@ -200,6 +219,24 @@ func init() {
 		I1X,
 		IX1,
 		I1X1,
+
+		// Post Quantum One-way KEM patterns.
+		PqN,
+
+		// Post Quantum Interactive (fundemental) KEM patterns.
+		PqNN,
+		PqNK,
+		PqNX,
+		PqXN,
+		PqXK,
+		PqXX,
+		PqKN,
+		PqKK,
+		PqKX,
+		PqIN,
+		PqIK,
+		PqIX,
+		// TODO: PSK patterns?
 	} {
 		if err := Register(v); err != nil {
 			panic("nyquist/pattern: failed to register built-in pattern: " + err.Error())

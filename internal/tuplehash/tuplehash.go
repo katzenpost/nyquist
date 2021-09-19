@@ -42,8 +42,7 @@ var constN = []byte("TupleHash")
 
 // Hasher is a TupleHash instance.
 type Hasher struct {
-	cShake     sha3.ShakeHash
-	outputSize uint64
+	cShake sha3.ShakeHash
 }
 
 // Write writes the byte-encoded tuple b to the TupleHash.
@@ -63,11 +62,17 @@ func (h *Hasher) Write(b []byte) (int, error) {
 
 // Sum appends the current hash to b and returns the resulting slice.
 // It does not change the underlying hash state.
-func (h *Hasher) Sum(b []byte) []byte {
+func (h *Hasher) Sum(b []byte, outputSize int) []byte {
+	// TODO: Once we switch to Go 1.17, assert outputSize <= math.MaxInt.
+	oSize := uint64(outputSize)
+	if oSize <= 0 || oSize > math.MaxUint64/8 {
+		panic("nyquist/internal/tuplehash: invalid output size")
+	}
+
 	cShake := h.cShake.Clone()
 
-	_, _ = cShake.Write(rightEncode(h.outputSize * 8)) // in bits
-	digest := make([]byte, int(h.outputSize))
+	_, _ = cShake.Write(rightEncode(oSize * 8)) // in bits
+	digest := make([]byte, int(oSize))
 	_, _ = cShake.Read(digest)
 	return append(b, digest...)
 }
@@ -75,30 +80,21 @@ func (h *Hasher) Sum(b []byte) []byte {
 // Clone creates a copy of an existing TupleHash instance.
 func (h *Hasher) Clone() *Hasher {
 	return &Hasher{
-		cShake:     h.cShake.Clone(),
-		outputSize: h.outputSize,
+		cShake: h.cShake.Clone(),
 	}
 }
 
-// New128 creates a new TupleHash128 instance with the specified output size
-// (in bytes) and customization string.
-func New128(outputSize int, customizationString []byte) *Hasher {
-	return doNew(128, outputSize, customizationString)
+// New128 creates a new TupleHash128 instance with the specified customization string.
+func New128(customizationString []byte) *Hasher {
+	return doNew(128, customizationString)
 }
 
-// New256 creates a new TupleHash256 instance with the specified output size
-// (in bytes) and customization string.
-func New256(outputSize int, customizationString []byte) *Hasher {
-	return doNew(256, outputSize, customizationString)
+// New256 creates a new TupleHash256 instance with the specified customization string.
+func New256(customizationString []byte) *Hasher {
+	return doNew(256, customizationString)
 }
 
-func doNew(securityStrength, outputSize int, customizationString []byte) *Hasher {
-	// TODO: Once we switch to Go 1.17, assert outputSize <= math.MaxInt.
-	oSize := uint64(outputSize)
-	if oSize <= 0 || oSize > math.MaxUint64/8 {
-		panic("nyquist/internal/tuplehash: invalid output size")
-	}
-
+func doNew(securityStrength int, customizationString []byte) *Hasher {
 	var cShake sha3.ShakeHash
 	switch securityStrength {
 	case 128:
@@ -110,8 +106,7 @@ func doNew(securityStrength, outputSize int, customizationString []byte) *Hasher
 	}
 
 	return &Hasher{
-		cShake:     cShake,
-		outputSize: oSize,
+		cShake: cShake,
 	}
 }
 

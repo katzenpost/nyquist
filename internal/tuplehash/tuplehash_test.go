@@ -180,11 +180,11 @@ func testVectors128(t *testing.T) {
 			},
 		},
 	} {
-		h := New128(vec.L, vec.S)
+		h := New128(vec.S)
 		for _, x := range vec.X {
 			_, _ = h.Write(x)
 		}
-		out := h.Sum(nil)
+		out := h.Sum(nil, vec.L)
 		require.Equal(vec.output, out, "[%d]: Output mismatch", i)
 	}
 }
@@ -237,11 +237,11 @@ func testVectors256(t *testing.T) {
 			},
 		},
 	} {
-		h := New256(vec.L, vec.S)
+		h := New256(vec.S)
 		for _, x := range vec.X {
 			_, _ = h.Write(x)
 		}
-		out := h.Sum(nil)
+		out := h.Sum(nil, vec.L)
 		require.Equal(vec.output, out, "[%d]: Output mismatch", i)
 	}
 }

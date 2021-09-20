@@ -41,6 +41,7 @@ import (
 	"gitlab.com/yawning/nyquist.git/hash"
 	"gitlab.com/yawning/nyquist.git/kem"
 	"gitlab.com/yawning/nyquist.git/pattern"
+	"gitlab.com/yawning/nyquist.git/seec"
 )
 
 const (
@@ -213,6 +214,11 @@ type KEMConfig struct {
 
 	// Observer is the optional handshake observer.
 	Observer HandshakeObserverKEM
+
+	// GenKey is the SEEC GenKey instance to be used to generate
+	// entropy for a KEM scheme when required.  If the value is `nil`,
+	// `seec.GenKeyPassthrough` will be used.
+	GenKey seec.GenKey
 }
 
 // HandshakeStatus is the status of a handshake.
@@ -312,8 +318,10 @@ type HandshakeState struct {
 
 	patterns []pattern.Message
 
-	dh  *dhState
-	kem *kemState
+	dh *dhState
+
+	kem     *kemState
+	genRand seec.GenRand
 
 	ss *SymmetricState
 
@@ -663,6 +671,7 @@ func NewHandshake(cfg *HandshakeConfig) (*HandshakeState, error) {
 			ctLen: cfg.Protocol.KEM.CiphertextSize(),
 		}
 		hs.status.KEM = &KEMStatus{}
+		var genKey seec.GenKey
 		if kemCfg := cfg.KEM; kemCfg != nil {
 			hs.kem.s = kemCfg.LocalStatic
 			hs.kem.e = kemCfg.LocalEphemeral
@@ -674,6 +683,17 @@ func NewHandshake(cfg *HandshakeConfig) (*HandshakeState, error) {
 			if kemCfg.LocalEphemeral != nil {
 				hs.status.KEM.LocalEphemeral = kemCfg.LocalEphemeral.Public()
 			}
+
+			genKey = kemCfg.GenKey
+		}
+		if genKey == nil {
+			genKey = seec.GenKeyPassthrough
+		}
+
+		var err error
+		hs.genRand, err = genKey(cfg.getRng(), 256)
+		if err != nil {
+			return nil, err
 		}
 	} else {
 		hs.dh = &dhState{

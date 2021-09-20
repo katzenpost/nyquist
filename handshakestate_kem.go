@@ -47,7 +47,7 @@ func (hs *HandshakeState) onWriteTokenE_KEM(dst []byte) []byte {
 	// hs.cfg.KEM.LocalEphemeral can be used to pre-generate the ephemeral key,
 	// so only generate when required.
 	if hs.kem.e == nil {
-		if hs.kem.e, hs.status.Err = hs.kem.impl.GenerateKeypair(hs.cfg.getRng()); hs.status.Err != nil {
+		if hs.kem.e, hs.status.Err = hs.kem.impl.GenerateKeypair(hs.genRand); hs.status.Err != nil {
 			return nil
 		}
 	}
@@ -155,7 +155,7 @@ func (hs *HandshakeState) onWriteTokenEkem(dst []byte) []byte {
 
 	// E(e):
 	// 1. $ct, k_j \gets INDCPAKEM.Encap(pk;r_i)$
-	ct, k, err := hs.kem.impl.Enc(hs.cfg.getRng(), hs.kem.re)
+	ct, k, err := hs.kem.impl.Enc(hs.genRand, hs.kem.re)
 	if err != nil {
 		hs.status.Err = err
 		return nil
@@ -210,7 +210,7 @@ func (hs *HandshakeState) onWriteTokenSkem(dst []byte) []byte {
 	}
 
 	//    1. $ct, k \gets INDCCAKEM.Encap(pk;r_i)$
-	ct, k, err := hs.kem.impl.Enc(hs.cfg.getRng(), hs.kem.rs)
+	ct, k, err := hs.kem.impl.Enc(hs.genRand, hs.kem.rs)
 	if err != nil {
 		hs.status.Err = err
 		return nil

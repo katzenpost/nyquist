@@ -35,7 +35,8 @@ import (
 	"encoding"
 	"errors"
 	"fmt"
-	"io"
+
+	"gitlab.com/yawning/nyquist.git/seec"
 
 	"github.com/cloudflare/circl/kem"
 	"github.com/cloudflare/circl/kem/schemes"
@@ -80,12 +81,12 @@ type KEM interface {
 
 	// GenerateKeypair generates a new KEM keypair using the provided
 	// entropy source.
-	GenerateKeypair(rng io.Reader) (Keypair, error)
+	GenerateKeypair(genRand seec.GenRand) (Keypair, error)
 
 	// Enc generates a shared key and ciphertext that encapsulates it
 	// for the provided public key using the provided entropy source,
 	// and returns the shared key and ciphertext.
-	Enc(rng io.Reader, dest PublicKey) ([]byte, []byte, error)
+	Enc(genRand seec.GenRand, dest PublicKey) ([]byte, []byte, error)
 
 	// ParsePrivateKey parses a binary encoded private key.
 	ParsePrivateKey(data []byte) (Keypair, error)
@@ -143,9 +144,9 @@ func (impl *kemCIRCL) String() string {
 	return impl.name
 }
 
-func (impl *kemCIRCL) GenerateKeypair(rng io.Reader) (Keypair, error) {
-	seed := make([]byte, impl.scheme.SeedSize())
-	if _, err := io.ReadFull(rng, seed); err != nil {
+func (impl *kemCIRCL) GenerateKeypair(genRand seec.GenRand) (Keypair, error) {
+	seed, err := genRand(impl.scheme.SeedSize())
+	if err != nil {
 		return nil, err
 	}
 
@@ -157,14 +158,14 @@ func (impl *kemCIRCL) GenerateKeypair(rng io.Reader) (Keypair, error) {
 	}, nil
 }
 
-func (impl *kemCIRCL) Enc(rng io.Reader, dest PublicKey) ([]byte, []byte, error) {
+func (impl *kemCIRCL) Enc(genRand seec.GenRand, dest PublicKey) ([]byte, []byte, error) {
 	pubTo, ok := dest.(*publicKeyCIRCL)
 	if !ok || pubTo.inner.Scheme() != impl.scheme {
 		return nil, nil, ErrMismatchedPublicKey
 	}
 
-	seed := make([]byte, impl.scheme.EncapsulationSeedSize())
-	if _, err := io.ReadFull(rng, seed); err != nil {
+	seed, err := genRand(impl.scheme.EncapsulationSeedSize())
+	if err != nil {
 		return nil, nil, err
 	}
 

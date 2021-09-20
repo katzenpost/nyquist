@@ -39,6 +39,7 @@ import (
 	"gitlab.com/yawning/nyquist.git/hash"
 	"gitlab.com/yawning/nyquist.git/kem"
 	"gitlab.com/yawning/nyquist.git/pattern"
+	"gitlab.com/yawning/nyquist.git/seec"
 )
 
 func TestPQExample(t *testing.T) {
@@ -47,6 +48,9 @@ func TestPQExample(t *testing.T) {
 	// Protocols can be constructed by parsing a protocol name.
 	protocol, err := NewProtocol("Noise_pqXX_Kyber1024_ChaChaPoly_BLAKE2s")
 	require.NoError(err, "NewProtocol")
+
+	seecGenRand, err := seec.GenKeyPRPAES(rand.Reader, 256)
+	require.NoError(err, "seec.GenKeyPRPAES")
 
 	// Protocols can also be constructed manually.
 	protocol2 := &Protocol{
@@ -58,23 +62,26 @@ func TestPQExample(t *testing.T) {
 	require.Equal(protocol, protocol2)
 
 	// Each side needs a HandshakeConfig, properly filled out.
-	aliceStatic, err := protocol.KEM.GenerateKeypair(rand.Reader)
+	aliceStatic, err := protocol.KEM.GenerateKeypair(seecGenRand)
 	require.NoError(err, "Generate Alice's static keypair")
 	aliceCfg := &HandshakeConfig{
 		Protocol: protocol,
 		KEM: &KEMConfig{
 			LocalStatic: aliceStatic,
+			GenKey:      seec.GenKeyPRPAES,
 		},
 		IsInitiator: true,
 	}
 
-	bobStatic, err := protocol.KEM.GenerateKeypair(rand.Reader)
+	bobStatic, err := protocol.KEM.GenerateKeypair(seecGenRand)
 	require.NoError(err, "Generate Bob's static keypair")
 	bobCfg := &HandshakeConfig{
 		Protocol: protocol,
 		KEM: &KEMConfig{
 			LocalStatic: bobStatic,
 		},
+		// SEECGenKey is optional, and just using the raw entropy
+		// device is supported.
 		IsInitiator: false,
 	}
 

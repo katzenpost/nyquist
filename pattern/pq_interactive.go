@@ -164,7 +164,7 @@ var (
 			{Token_s},
 		},
 		messages: []Message{
-			{Token_e, Token_skem, Token_s},
+			{Token_skem, Token_e, Token_s},
 			{Token_ekem, Token_skem},
 		},
 		isKEM: true,

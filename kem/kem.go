@@ -68,6 +68,9 @@ var (
 	// Kyber1024 is the Kyber1024.CCAKEM.
 	Kyber1024 = mustCirclToKEM("Kyber1024")
 
+	// Kyber768 X25519 hybrid.
+	Kyber768X25519 = mustCirclToKEM("Kyber768-X25519")
+
 	supportedKEMs = map[string]KEM{
 		"Kyber512":  Kyber512,
 		"Kyber768":  Kyber768,

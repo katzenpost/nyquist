@@ -29,7 +29,7 @@
 
 package nyquist
 
-import "gitlab.com/yawning/nyquist.git/pattern"
+import "github.com/katzenpost/nyquist/pattern"
 
 func (hs *HandshakeState) onWriteTokenE_DH(dst []byte) []byte {
 	// hs.cfg.DH.LocalEphemeral can be used to pre-generate the ephemeral key,

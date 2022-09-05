@@ -35,11 +35,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/yawning/nyquist.git/cipher"
-	"gitlab.com/yawning/nyquist.git/hash"
-	"gitlab.com/yawning/nyquist.git/kem"
-	"gitlab.com/yawning/nyquist.git/pattern"
-	"gitlab.com/yawning/nyquist.git/seec"
+	"github.com/katzenpost/nyquist/cipher"
+	"github.com/katzenpost/nyquist/hash"
+	"github.com/katzenpost/nyquist/kem"
+	"github.com/katzenpost/nyquist/pattern"
+	"github.com/katzenpost/nyquist/seec"
 )
 
 func TestPQExample(t *testing.T) {

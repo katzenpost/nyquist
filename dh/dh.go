@@ -29,7 +29,7 @@
 
 // Package dh implments the Noise Protocol Framework Diffie-Hellman function
 // abstract interface and standard DH functions.
-package dh // import "gitlab.com/yawning/nyquist.git/dh"
+package dh // import "github.com/katzenpost/nyquist/dh"
 
 import (
 	"encoding"

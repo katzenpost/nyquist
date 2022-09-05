@@ -34,8 +34,8 @@ import (
 
 	"golang.org/x/crypto/hkdf"
 
-	"gitlab.com/yawning/nyquist.git/cipher"
-	"gitlab.com/yawning/nyquist.git/hash"
+	"github.com/katzenpost/nyquist/cipher"
+	"github.com/katzenpost/nyquist/hash"
 )
 
 // SymmetricState encapsulates all symmetric cryptography used by the Noise

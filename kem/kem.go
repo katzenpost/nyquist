@@ -29,14 +29,14 @@
 
 // Package kem implments the PQNoise Key Encapsulation Mechanism function
 // abstract interface and "standard" functions.
-package kem // import "gitlab.com/yawning/nyquist.git/kem"
+package kem // import "github.com/katzenpost/nyquist/kem"
 
 import (
 	"encoding"
 	"errors"
 	"fmt"
 
-	"gitlab.com/yawning/nyquist.git/seec"
+	"github.com/katzenpost/nyquist/seec"
 
 	"github.com/cloudflare/circl/kem"
 	"github.com/cloudflare/circl/kem/schemes"

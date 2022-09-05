@@ -34,7 +34,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/yawning/nyquist.git/cipher"
+	"github.com/katzenpost/nyquist/cipher"
 )
 
 func TestCipherState(t *testing.T) {

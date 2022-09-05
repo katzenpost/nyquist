@@ -1,4 +1,4 @@
-module gitlab.com/yawning/nyquist.git
+module github.com/katzenpost/nyquist
 
 go 1.16
 

@@ -200,8 +200,8 @@ func (kp *Keypair25519) DH(publicKey PublicKey) ([]byte, error) {
 	// > output and signal an error instead. This behavior is discouraged because it adds
 	// > complexity and implementation variance, and does not improve security. This behavior is
 	// > allowed because it might match the behavior of some software.
-	var sharedSecret [32]byte
-	x25519.ScalarMult(&sharedSecret, &kp.rawPrivateKey, &pubKey.rawPublicKey) //nolint:staticcheck
+	sharedSecret := new(x25519.Key)
+	x25519.Shared(sharedSecret, &kp.rawPrivateKey, &pubKey.rawPublicKey) //nolint:staticcheck
 
 	return sharedSecret[:], nil
 }

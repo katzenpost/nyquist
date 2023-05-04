@@ -191,10 +191,17 @@ func (kp *Keypair25519) DH(publicKey PublicKey) ([]byte, error) {
 		return nil, ErrMismatchedPublicKey
 	}
 
-	// Ignore the return value and just return all-zeros when the public
-	// key is low-order, since that is the standard Noise behavior.
-	var sharedSecret x25519.Key
-	_ = x25519.Shared(&sharedSecret, &kp.rawPrivateKey, &pubKey.rawPublicKey)
+	// Note: This intentionally used the deprecated API, as per-the
+	// Noise specification (r34) 12.1:
+	//
+	// > Invalid public key values will produce an output of all zeros.
+	// >
+	// > Alternatively, implementations are allowed to detect inputs that produce an all-zeros
+	// > output and signal an error instead. This behavior is discouraged because it adds
+	// > complexity and implementation variance, and does not improve security. This behavior is
+	// > allowed because it might match the behavior of some software.
+	var sharedSecret [32]byte
+	x25519.ScalarMult(&sharedSecret, &kp.rawPrivateKey, &pubKey.rawPublicKey) //nolint:staticcheck
 
 	return sharedSecret[:], nil
 }

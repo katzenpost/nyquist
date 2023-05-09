@@ -277,6 +277,15 @@ func mustCirclToKEM(s string) *kemCIRCL {
 	}
 }
 
+// FromKEM encapsulates the given circl KEM Scheme object
+// in our kemCIRCL wrapper type.
+func FromKEM(scheme kem.Scheme) *kemCIRCL {
+	return &kemCIRCL{
+		name:   scheme.Name(),
+		scheme: scheme,
+	}
+}
+
 func mustCirclToPublic(inner kem.PublicKey) *publicKeyCIRCL {
 	innerBytes, _ := inner.MarshalBinary()
 	return &publicKeyCIRCL{

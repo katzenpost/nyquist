@@ -36,8 +36,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/yawning/nyquist.git/dh"
-	"gitlab.com/yawning/nyquist.git/pattern"
+	"github.com/katzenpost/nyquist/dh"
+	"github.com/katzenpost/nyquist/pattern"
 )
 
 const xFixedSize = 32 + 32 + 16 + 16

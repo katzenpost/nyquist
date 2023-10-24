@@ -37,9 +37,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/yawning/nyquist.git/dh"
-	"gitlab.com/yawning/nyquist.git/pattern"
-	"gitlab.com/yawning/nyquist.git/vectors"
+	"github.com/katzenpost/nyquist/dh"
+	"github.com/katzenpost/nyquist/pattern"
+	"github.com/katzenpost/nyquist/vectors"
 )
 
 func TestVectors(t *testing.T) {

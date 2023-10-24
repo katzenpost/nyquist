@@ -34,7 +34,7 @@ import (
 	"errors"
 	"math"
 
-	"gitlab.com/yawning/nyquist.git/cipher"
+	"github.com/katzenpost/nyquist/cipher"
 )
 
 const (

@@ -29,7 +29,7 @@
 
 // Package cipher implments the Noise Protocol Framework cipher function
 // abstract interface and standard cipher functions.
-package cipher // import "gitlab.com/yawning/nyquist.git/cipher"
+package cipher // import "github.com/katzenpost/nyquist/cipher"
 
 import (
 	"crypto/cipher"

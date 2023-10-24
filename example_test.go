@@ -35,10 +35,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/yawning/nyquist.git/cipher"
-	"gitlab.com/yawning/nyquist.git/dh"
-	"gitlab.com/yawning/nyquist.git/hash"
-	"gitlab.com/yawning/nyquist.git/pattern"
+	"github.com/katzenpost/nyquist/cipher"
+	"github.com/katzenpost/nyquist/dh"
+	"github.com/katzenpost/nyquist/hash"
+	"github.com/katzenpost/nyquist/pattern"
 )
 
 func TestExample(t *testing.T) {

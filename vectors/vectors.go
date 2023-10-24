@@ -28,7 +28,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Package vectors provides types for the JSON formatted test vectors.
-package vectors // import "gitlab.com/yawning/nyquist.git/vectors"
+package vectors // import "github.com/katzenpost/nyquist/vectors"
 
 // Message is a test vector handshake message.
 type Message struct {

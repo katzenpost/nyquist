@@ -32,7 +32,7 @@ package nyquist
 import (
 	"errors"
 
-	"gitlab.com/yawning/nyquist.git/pattern"
+	"github.com/katzenpost/nyquist/pattern"
 )
 
 var (

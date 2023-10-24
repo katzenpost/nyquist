@@ -28,7 +28,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Package nyquist implements the Noise Protocol Framework.
-package nyquist // import "gitlab.com/yawning/nyquist.git"
+package nyquist // import "github.com/katzenpost/nyquist"
 
 import "errors"
 

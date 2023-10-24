@@ -29,7 +29,7 @@
 
 // Package hash implments the Noise Protocol Framework hash function abstract
 // interface and standard hash functions.
-package hash // import "gitlab.com/yawning/nyquist.git/hash"
+package hash // import "github.com/katzenpost/nyquist/hash"
 
 import (
 	"crypto/sha256"

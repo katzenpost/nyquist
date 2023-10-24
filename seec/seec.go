@@ -36,7 +36,7 @@ import (
 	"fmt"
 	"io"
 
-	"gitlab.com/yawning/nyquist.git/internal/tuplehash"
+	"github.com/katzenpost/nyquist/internal/tuplehash"
 
 	"github.com/rfjakob/eme"
 	"gitlab.com/yawning/bsaes.git"

@@ -32,209 +32,46 @@
 package kem // import "github.com/katzenpost/nyquist/kem"
 
 import (
-	"encoding"
 	"errors"
-	"fmt"
+
+	"github.com/katzenpost/hpqc/kem"
 
 	"github.com/katzenpost/nyquist/seec"
-
-	"github.com/cloudflare/circl/kem"
-	"github.com/cloudflare/circl/kem/schemes"
 )
 
 var (
-	// ErrMalformedPrivateKey is the error returned when a serialized
-	// private key is malformed.
-	ErrMalformedPrivateKey = errors.New("nyquist/kem: malformed private key")
-
-	// ErrMalformedPublicKey is the error returned when a serialized public
-	// key is malformed.
-	ErrMalformedPublicKey = errors.New("nyquist/kem: malformed public key")
-
 	// ErrMalformedCiphertext is the error returns when a serialized
 	// ciphertext is malformed.
 	ErrMalformedCiphertext = errors.New("nyquist/kem: malformed ciphertext")
-
-	// ErrMismatchedPublicKey is the error returned when a public key for an
-	// unexpected algorithm is provided to a KEM operation.
-	ErrMismatchedPublicKey = errors.New("nyquist/kem: mismatched public key")
-
-	// Kyber512 is the Kyber512.CCAKEM.
-	Kyber512 = mustCirclToKEM("Kyber512")
-
-	// Kyber768 is the Kyber768.CCAKEM.
-	Kyber768 = mustCirclToKEM("Kyber768")
-
-	// Kyber1024 is the Kyber1024.CCAKEM.
-	Kyber1024 = mustCirclToKEM("Kyber1024")
-
-	supportedKEMs = map[string]KEM{
-		"Kyber512":  Kyber512,
-		"Kyber768":  Kyber768,
-		"Kyber1024": Kyber1024,
-	}
 )
 
-// KEM is a Key Encapsulation Mechanism algorithm.
-type KEM interface {
-	fmt.Stringer
-
-	// GenerateKeypair generates a new KEM keypair using the provided
-	// entropy source.
-	GenerateKeypair(genRand seec.GenRand) (Keypair, error)
-
-	// Enc generates a shared key and ciphertext that encapsulates it
-	// for the provided public key using the provided entropy source,
-	// and returns the shared key and ciphertext.
-	Enc(genRand seec.GenRand, dest PublicKey) ([]byte, []byte, error)
-
-	// ParsePrivateKey parses a binary encoded private key.
-	ParsePrivateKey(data []byte) (Keypair, error)
-
-	// ParsePublicKey parses a binary encoded public key.
-	ParsePublicKey(data []byte) (PublicKey, error)
-
-	// PrivateKeySize returns the size of private keys in bytes.
-	PrivateKeySize() int
-
-	// PublicKeySize returns the size of public keys in bytes.
-	PublicKeySize() int
-
-	// CiphertextSize returns the size of encapsualted ciphertexts in bytes.
-	CiphertextSize() int
-
-	// SharedKeySize returns the size of the shared output in bytes.
-	SharedKeySize() int
-}
-
-// FromString returns a KEM by algorithm name, or nil.
-func FromString(s string) KEM {
-	return supportedKEMs[s]
-}
-
-// Keypair is a KEM keypair.
-type Keypair interface {
-	encoding.BinaryMarshaler
-
-	// Public returns the public key of the keypair.
-	Public() PublicKey
-
-	// Dec decapsulates the ciphertext and returns the encapsulated key.
-	Dec(ct []byte) ([]byte, error)
-}
-
-// PublicKey is a KEM public key.
-type PublicKey interface {
-	encoding.BinaryMarshaler
-
-	// Bytes returns the binary serialized public key.
-	//
-	// Warning: Altering the returned slice is unsupported and will lead
-	// to unexpected behavior.
-	Bytes() []byte
-}
-
-// kemCIRCL is a generic wrapper around a KEM scheme provided by CIRCL.
-type kemCIRCL struct {
-	name   string
-	scheme kem.Scheme
-}
-
-func (impl *kemCIRCL) String() string {
-	return impl.name
-}
-
-func (impl *kemCIRCL) GenerateKeypair(genRand seec.GenRand) (Keypair, error) {
-	seed, err := genRand(impl.scheme.SeedSize())
+func GenerateKeypair(scheme kem.Scheme, genRand seec.GenRand) (kem.PublicKey, kem.PrivateKey) {
+	seed, err := genRand(scheme.SeedSize())
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-
-	pub, priv := impl.scheme.DeriveKeyPair(seed)
-
-	return &keypairCIRCL{
-		privateKey: priv,
-		publicKey:  mustCirclToPublic(pub),
-	}, nil
+	return scheme.DeriveKeyPair(seed)
 }
 
-func (impl *kemCIRCL) Enc(genRand seec.GenRand, dest PublicKey) ([]byte, []byte, error) {
-	pubTo, ok := dest.(*publicKeyCIRCL)
-	if !ok || pubTo.inner.Scheme() != impl.scheme {
-		return nil, nil, ErrMismatchedPublicKey
-	}
-
-	seed, err := genRand(impl.scheme.EncapsulationSeedSize())
+func Enc(genRand seec.GenRand, pubTo kem.PublicKey) ([]byte, []byte, error) {
+	seed, err := genRand(pubTo.Scheme().EncapsulationSeedSize())
 	if err != nil {
 		return nil, nil, err
 	}
-
-	ct, ss, err := impl.scheme.EncapsulateDeterministically(pubTo.inner, seed)
+	ct, ss, err := pubTo.Scheme().EncapsulateDeterministically(pubTo, seed)
 	if err != nil {
 		// This should NEVER happen.
 		panic("nyquist/kem: failed to encapsulate: " + err.Error())
 	}
-
 	return ct, ss, nil
 }
 
-func (impl *kemCIRCL) ParsePrivateKey(data []byte) (Keypair, error) {
-	priv, err := impl.scheme.UnmarshalBinaryPrivateKey(data)
-	if err != nil {
-		return nil, ErrMalformedPrivateKey
-	}
-
-	kp := &keypairCIRCL{
-		privateKey: priv,
-		publicKey:  mustCirclToPublic(priv.Public()),
-	}
-
-	return kp, nil
-}
-
-func (impl *kemCIRCL) ParsePublicKey(data []byte) (PublicKey, error) {
-	pub, err := impl.scheme.UnmarshalBinaryPublicKey(data)
-	if err != nil {
-		return nil, ErrMalformedPublicKey
-	}
-
-	return mustCirclToPublic(pub), nil
-}
-
-func (impl *kemCIRCL) PrivateKeySize() int {
-	return impl.scheme.PrivateKeySize()
-}
-
-func (impl *kemCIRCL) PublicKeySize() int {
-	return impl.scheme.PublicKeySize()
-}
-
-func (impl *kemCIRCL) CiphertextSize() int {
-	return impl.scheme.CiphertextSize()
-}
-
-func (impl *kemCIRCL) SharedKeySize() int {
-	return impl.scheme.SharedKeySize()
-}
-
-// keypairCIRCL is a generic wrapper around a keypair backed by CIRCL.
-type keypairCIRCL struct {
-	privateKey kem.PrivateKey
-	publicKey  *publicKeyCIRCL
-}
-
-func (kp *keypairCIRCL) MarshalBinary() ([]byte, error) {
-	return kp.privateKey.MarshalBinary()
-}
-
-func (kp *keypairCIRCL) Dec(ct []byte) ([]byte, error) {
-	kpScheme := kp.privateKey.Scheme()
-
-	if len(ct) != kpScheme.CiphertextSize() {
+func Dec(privateKey kem.PrivateKey, ciphertext []byte) ([]byte, error) {
+	if len(ciphertext) != privateKey.Scheme().CiphertextSize() {
 		return nil, ErrMalformedCiphertext
 	}
 
-	ss, err := kpScheme.Decapsulate(kp.privateKey, ct)
+	ss, err := privateKey.Scheme().Decapsulate(privateKey, ciphertext)
 	if err != nil {
 		// This should NEVER happen, all KEMs that are currently still
 		// in the NIST competition return a deterministic random value
@@ -243,41 +80,4 @@ func (kp *keypairCIRCL) Dec(ct []byte) ([]byte, error) {
 	}
 
 	return ss, nil
-}
-
-func (kp *keypairCIRCL) Public() PublicKey {
-	return kp.publicKey
-}
-
-// publicKeyCIRCL is a generic wrapper around a public key backed by CIRCL.
-type publicKeyCIRCL struct {
-	inner      kem.PublicKey
-	innerBytes []byte
-}
-
-func (pubKey *publicKeyCIRCL) MarshalBinary() ([]byte, error) {
-	return pubKey.inner.MarshalBinary()
-}
-
-func (pubKey *publicKeyCIRCL) Bytes() []byte {
-	return pubKey.innerBytes
-}
-
-func mustCirclToKEM(s string) *kemCIRCL {
-	scheme := schemes.ByName(s)
-	if scheme == nil {
-		panic("nyquist/kem: invalid scheme: " + s)
-	}
-	return &kemCIRCL{
-		name:   s,
-		scheme: scheme,
-	}
-}
-
-func mustCirclToPublic(inner kem.PublicKey) *publicKeyCIRCL {
-	innerBytes, _ := inner.MarshalBinary()
-	return &publicKeyCIRCL{
-		inner:      inner,
-		innerBytes: innerBytes,
-	}
 }

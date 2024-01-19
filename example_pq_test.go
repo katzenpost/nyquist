@@ -35,6 +35,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/katzenpost/hpqc/kem/schemes"
+
 	"github.com/katzenpost/nyquist/cipher"
 	"github.com/katzenpost/nyquist/hash"
 	"github.com/katzenpost/nyquist/kem"
@@ -55,15 +57,14 @@ func TestPQExample(t *testing.T) {
 	// Protocols can also be constructed manually.
 	protocol2 := &Protocol{
 		Pattern: pattern.PqXX,
-		KEM:     kem.Kyber1024,
+		KEM:     schemes.ByName("Kyber1024"),
 		Cipher:  cipher.ChaChaPoly,
 		Hash:    hash.BLAKE2s,
 	}
 	require.Equal(protocol, protocol2)
 
 	// Each side needs a HandshakeConfig, properly filled out.
-	aliceStatic, err := protocol.KEM.GenerateKeypair(seecGenRand)
-	require.NoError(err, "Generate Alice's static keypair")
+	_, aliceStatic := kem.GenerateKeypair(schemes.ByName("Kyber1024"), seecGenRand)
 	aliceCfg := &HandshakeConfig{
 		Protocol: protocol,
 		KEM: &KEMConfig{
@@ -73,7 +74,7 @@ func TestPQExample(t *testing.T) {
 		IsInitiator: true,
 	}
 
-	bobStatic, err := protocol.KEM.GenerateKeypair(seecGenRand)
+	_, bobStatic := kem.GenerateKeypair(schemes.ByName("Kyber1024"), seecGenRand)
 	require.NoError(err, "Generate Bob's static keypair")
 	bobCfg := &HandshakeConfig{
 		Protocol: protocol,
@@ -138,9 +139,9 @@ func TestPQExample(t *testing.T) {
 	bobStatus := bobHs.GetStatus()
 
 	require.Equal(aliceStatus.HandshakeHash, bobStatus.HandshakeHash, "Handshake hashes match")
-	require.Equal(aliceStatus.KEM.LocalEphemeral.Bytes(), bobStatus.KEM.RemoteEphemeral.Bytes())
-	require.Equal(aliceStatus.KEM.RemoteStatic.Bytes(), bobStatic.Public().Bytes())
-	require.Equal(bobStatus.KEM.RemoteStatic.Bytes(), aliceStatic.Public().Bytes())
+	require.True(aliceStatus.KEM.LocalEphemeral.Equal(bobStatus.KEM.RemoteEphemeral))
+	require.True(aliceStatus.KEM.RemoteStatic.Equal(bobStatic.Public()))
+	require.True(bobStatus.KEM.RemoteStatic.Equal(aliceStatic.Public()))
 	// Note: Unlike in normal XX, bob does not generate `e`.
 	require.Nil(aliceStatus.KEM.RemoteEphemeral)
 	require.Nil(bobStatus.KEM.LocalEphemeral)

@@ -31,15 +31,18 @@ package nyquist
 
 import (
 	"crypto/rand"
+	"encoding"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
 
+	"github.com/katzenpost/hpqc/kem"
+	"github.com/katzenpost/hpqc/kem/schemes"
+
 	"github.com/katzenpost/nyquist/cipher"
 	"github.com/katzenpost/nyquist/dh"
 	"github.com/katzenpost/nyquist/hash"
-	"github.com/katzenpost/nyquist/kem"
 	"github.com/katzenpost/nyquist/pattern"
 	"github.com/katzenpost/nyquist/seec"
 )
@@ -69,7 +72,7 @@ type Protocol struct {
 	Pattern pattern.Pattern
 
 	DH  dh.DH
-	KEM kem.KEM
+	KEM kem.Scheme
 
 	Cipher cipher.Cipher
 	Hash   hash.Hash
@@ -86,7 +89,7 @@ func (pr *Protocol) String() string {
 		if pr.KEM == nil || pr.DH != nil {
 			return invalidProtocol
 		}
-		kexStr = pr.KEM.String()
+		kexStr = pr.KEM.Name()
 	} else {
 		if pr.KEM != nil || pr.DH == nil {
 			return invalidProtocol
@@ -120,7 +123,7 @@ func NewProtocol(s string) (*Protocol, error) {
 	var pr Protocol
 	if pr.Pattern = pattern.FromString(parts[1]); pr.Pattern != nil {
 		if pr.Pattern.IsKEM() {
-			pr.KEM = kem.FromString(parts[2])
+			pr.KEM = schemes.ByName(parts[2])
 		} else {
 			pr.DH = dh.FromString(parts[2])
 		}
@@ -201,10 +204,10 @@ type DHConfig struct {
 // of a handshake.
 type KEMConfig struct {
 	// LocalStatic is the local static keypair, if any (`s`).
-	LocalStatic kem.Keypair
+	LocalStatic kem.PrivateKey
 
 	// LocalEphemeral is the local ephemeral keypair, if any (`e`).
-	LocalEphemeral kem.Keypair
+	LocalEphemeral kem.PrivateKey
 
 	// RemoteStatic is the remote static public key, if any (`rs`).
 	RemoteStatic kem.PublicKey
@@ -345,10 +348,10 @@ type dhState struct {
 }
 
 type kemState struct {
-	impl kem.KEM
+	impl kem.Scheme
 
-	s  kem.Keypair
-	e  kem.Keypair
+	s  kem.PrivateKey
+	e  kem.PrivateKey
 	rs kem.PublicKey
 	re kem.PublicKey
 
@@ -561,7 +564,7 @@ func (hs *HandshakeState) ReadMessage(dst, payload []byte) ([]byte, error) {
 }
 
 type bytesAble interface {
-	Bytes() []byte
+	encoding.BinaryMarshaler
 }
 
 func (hs *HandshakeState) handlePreMessages() error {
@@ -621,7 +624,10 @@ func (hs *HandshakeState) handlePreMessages() error {
 				if keys.e == nil {
 					return fmt.Errorf("nyquist/New: %s e not set", keys.side)
 				}
-				pkBytes := keys.e.Bytes()
+				pkBytes, err := keys.e.MarshalBinary()
+				if err != nil {
+					return err
+				}
 				hs.ss.MixHash(pkBytes)
 				if hs.cfg.Protocol.Pattern.NumPSKs() > 0 {
 					hs.ss.MixKey(pkBytes)
@@ -630,7 +636,11 @@ func (hs *HandshakeState) handlePreMessages() error {
 				if keys.s == nil {
 					return fmt.Errorf("nyquist/New: %s s not set", keys.side)
 				}
-				hs.ss.MixHash(keys.s.Bytes())
+				blob, err := keys.s.MarshalBinary()
+				if err != nil {
+					return err
+				}
+				hs.ss.MixHash(blob)
 			default:
 				return errors.New("nyquist/New: invalid pre-message token: " + v.String())
 			}

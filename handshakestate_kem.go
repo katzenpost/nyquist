@@ -32,6 +32,7 @@ package nyquist
 import (
 	"errors"
 
+	"github.com/katzenpost/nyquist/kem"
 	"github.com/katzenpost/nyquist/pattern"
 )
 
@@ -47,12 +48,15 @@ func (hs *HandshakeState) onWriteTokenE_KEM(dst []byte) []byte {
 	// hs.cfg.KEM.LocalEphemeral can be used to pre-generate the ephemeral key,
 	// so only generate when required.
 	if hs.kem.e == nil {
-		if hs.kem.e, hs.status.Err = hs.kem.impl.GenerateKeypair(hs.genRand); hs.status.Err != nil {
-			return nil
-		}
+		_, priv := kem.GenerateKeypair(hs.kem.impl, hs.genRand)
+		hs.kem.e = priv
 	}
 
-	eBytes := hs.kem.e.Public().Bytes()
+	eBytes, err := hs.kem.e.Public().MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
+
 	hs.status.KEM.LocalEphemeral = hs.kem.e.Public()
 
 	hs.ss.MixHash(eBytes)
@@ -69,7 +73,7 @@ func (hs *HandshakeState) onReadTokenE_KEM(payload []byte) []byte {
 		return nil
 	}
 	eBytes, tail := payload[:pkLen], payload[pkLen:]
-	if hs.kem.re, hs.status.Err = hs.kem.impl.ParsePublicKey(eBytes); hs.status.Err != nil {
+	if hs.kem.re, hs.status.Err = hs.kem.impl.UnmarshalBinaryPublicKey(eBytes); hs.status.Err != nil {
 		return nil
 	}
 	hs.status.KEM.RemoteEphemeral = hs.kem.re
@@ -90,7 +94,10 @@ func (hs *HandshakeState) onWriteTokenS_KEM(dst []byte) []byte {
 		hs.status.Err = errMissingS
 		return nil
 	}
-	sBytes := hs.kem.s.Public().Bytes()
+	sBytes, err := hs.kem.s.Public().MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
 	return hs.ss.EncryptAndHash(dst, sBytes)
 }
 
@@ -112,7 +119,7 @@ func (hs *HandshakeState) onReadTokenS_KEM(payload []byte) []byte {
 	if sBytes, hs.status.Err = hs.ss.DecryptAndHash(nil, temp); hs.status.Err != nil {
 		return nil
 	}
-	if hs.kem.rs, hs.status.Err = hs.kem.impl.ParsePublicKey(sBytes); hs.status.Err != nil {
+	if hs.kem.rs, hs.status.Err = hs.kem.impl.UnmarshalBinaryPublicKey(sBytes); hs.status.Err != nil {
 		return nil
 	}
 	hs.status.KEM.RemoteStatic = hs.kem.rs
@@ -134,7 +141,7 @@ func (hs *HandshakeState) onReadTokenEkem(payload []byte) []byte {
 
 	hs.ss.MixHash(ctBytes)
 
-	k, err := hs.kem.e.Dec(ctBytes)
+	k, err := hs.kem.impl.Decapsulate(hs.kem.e, ctBytes)
 	if err != nil {
 		hs.status.Err = err
 		return nil
@@ -155,7 +162,7 @@ func (hs *HandshakeState) onWriteTokenEkem(dst []byte) []byte {
 
 	// E(e):
 	// 1. $ct, k_j \gets INDCPAKEM.Encap(pk;r_i)$
-	ct, k, err := hs.kem.impl.Enc(hs.genRand, hs.kem.re)
+	ct, k, err := kem.Enc(hs.genRand, hs.kem.re)
 	if err != nil {
 		hs.status.Err = err
 		return nil
@@ -189,7 +196,7 @@ func (hs *HandshakeState) onReadTokenSkem(payload []byte) []byte {
 		return nil
 	}
 
-	k, err := hs.kem.s.Dec(ctBytes)
+	k, err := kem.Dec(hs.kem.s, ctBytes)
 	if err != nil {
 		hs.status.Err = err
 		return nil
@@ -210,7 +217,7 @@ func (hs *HandshakeState) onWriteTokenSkem(dst []byte) []byte {
 	}
 
 	//    1. $ct, k \gets INDCCAKEM.Encap(pk;r_i)$
-	ct, k, err := hs.kem.impl.Enc(hs.genRand, hs.kem.rs)
+	ct, k, err := kem.Enc(hs.genRand, hs.kem.rs)
 	if err != nil {
 		hs.status.Err = err
 		return nil

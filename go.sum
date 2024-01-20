@@ -1,3 +1,5 @@
+codeberg.org/dawuud/highctidh v1.0.2024010702-0.20240119231727-003bd97f7b44 h1:kDS/MikD5KG0A9NJTFtgD+Mn8ftC7FCDM0Torv+FicI=
+codeberg.org/dawuud/highctidh v1.0.2024010702-0.20240119231727-003bd97f7b44/go.mod h1:rCvm5BNu5q2kHnM0XzbdEY9tuOqNqp/OQpLVeBCrEGg=
 filippo.io/edwards25519 v1.0.0 h1:0wAIcmJUqRdI8IJ/3eGi5/HwXZWPujYXXlkrQogz0Ek=
 filippo.io/edwards25519 v1.0.0/go.mod h1:N1IkdkCkiLB6tki+MYJoSx2JTY9NUlxZE7eHn5EwJns=
 github.com/BurntSushi/toml v1.3.2/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
@@ -32,11 +34,15 @@ github.com/katzenpost/hpqc v0.0.0-20240114200940-965ee79525e4 h1:CyXnmbjecBxzUrC
 github.com/katzenpost/hpqc v0.0.0-20240114200940-965ee79525e4/go.mod h1:vE/VSJn85pbjoKdQ+ECWIKTfMJDYltCsUL2chEYXPCQ=
 github.com/katzenpost/hpqc v0.0.0-20240119071246-a9281bda53d9 h1:D9TEHskDNQF74qzTImh/vV7w7j2nP7itABustdVRUW4=
 github.com/katzenpost/hpqc v0.0.0-20240119071246-a9281bda53d9/go.mod h1:vE/VSJn85pbjoKdQ+ECWIKTfMJDYltCsUL2chEYXPCQ=
+github.com/katzenpost/hpqc v0.0.0-20240120003156-59686a802fde h1:IiqB/Q42HCsaRkhtu6hNNZBGspjJUmgauxYzAF0IKW4=
+github.com/katzenpost/hpqc v0.0.0-20240120003156-59686a802fde/go.mod h1:hykgfxOR2b5weiqe7TDDl71PkIaIuuKXH6BtS0ftJng=
 github.com/katzenpost/nyquist v0.0.2/go.mod h1:1x/VqOl8InVjCeUS91EJYjHp+uU1EEJUEvAZhKBUyT0=
 github.com/katzenpost/nyquist v0.0.3-0.20231119132407-166503183e1d/go.mod h1:vvdOm//ncHrdSR9QrzdBF6DYvpyo4B9yyjTO6hEEXI4=
+github.com/katzenpost/sntrup4591761 v0.0.0-20231024131303-8755eb1986b8 h1:TsKxH0x2RUwf5rBw67k15bqVM3oVbexA9oaTZQLIy3Y=
 github.com/katzenpost/sntrup4591761 v0.0.0-20231024131303-8755eb1986b8/go.mod h1:Hmcrwom7jcEmGdo0CsyuJNnldPeyS+M07FuCbo7I8fw=
 github.com/katzenpost/sphincsplus v0.0.1/go.mod h1:oSEQjtj0GRF8Nzl3L3sMCbLk+m/xWwEh03rTKzVwgIc=
 github.com/katzenpost/sphincsplus v0.0.2-0.20240114192234-1dc77b544e31/go.mod h1:VFrCPnmbxQLBi+qJfWHUqvpvTMZrYBMZEEy0AidY0nE=
+github.com/mattn/go-pointer v0.0.1 h1:n+XhsuGeVO6MEAp7xyEukFINEa+Quek5psIR/ylA6o0=
 github.com/mattn/go-pointer v0.0.1/go.mod h1:2zXcozF6qYGgmsG+SeTZz3oAbFLdD3OWqnUbNvJZAlc=
 github.com/oasislabs/deoxysii v0.0.0-20190807103041-6159f99c2236 h1:eTbRemVO4uAXU5RlqqQ/OiPtBcB3tBez28rV0JusKss=
 github.com/oasislabs/deoxysii v0.0.0-20190807103041-6159f99c2236/go.mod h1:gFIu170Sklo1wPRTYMTDxA664TYdgrl9NENFXfC+u3g=

@@ -3,6 +3,7 @@ module github.com/katzenpost/nyquist
 go 1.16
 
 require (
+	codeberg.org/vula/highctidh v1.0.2024012400 // indirect
 	github.com/cloudflare/circl v1.0.1-0.20210909233310-258cb6f0e1ab
 	github.com/katzenpost/hpqc v0.0.0-20240206001207-cb2c611c95c8
 	github.com/oasislabs/deoxysii v0.0.0-20190807103041-6159f99c2236

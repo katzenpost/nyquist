@@ -3,12 +3,8 @@ module github.com/katzenpost/nyquist
 go 1.16
 
 require (
-	codeberg.org/dawuud/highctidh v1.0.2024010702-0.20240119231727-003bd97f7b44 // indirect
 	github.com/cloudflare/circl v1.0.1-0.20210909233310-258cb6f0e1ab
-	github.com/go-faster/xor v1.0.0 // indirect
-	github.com/katzenpost/chacha20 v0.0.0-20190910113340-7ce890d6a556 // indirect
-	github.com/katzenpost/circl v0.0.1-0.20240114190552-a60da6747ebd // indirect
-	github.com/katzenpost/hpqc v0.0.0-20240120003156-59686a802fde // indirect
+	github.com/katzenpost/hpqc v0.0.0-20240206001207-cb2c611c95c8
 	github.com/oasislabs/deoxysii v0.0.0-20190807103041-6159f99c2236
 	github.com/rfjakob/eme v1.1.2
 	github.com/stretchr/testify v1.8.4

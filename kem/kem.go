@@ -54,11 +54,7 @@ func GenerateKeypair(scheme kem.Scheme, genRand seec.GenRand) (kem.PublicKey, ke
 }
 
 func Enc(genRand seec.GenRand, pubTo kem.PublicKey) ([]byte, []byte, error) {
-	seed, err := genRand(pubTo.Scheme().EncapsulationSeedSize())
-	if err != nil {
-		return nil, nil, err
-	}
-	ct, ss, err := pubTo.Scheme().EncapsulateDeterministically(pubTo, seed)
+	ct, ss, err := pubTo.Scheme().Encapsulate(pubTo)
 	if err != nil {
 		// This should NEVER happen.
 		panic("nyquist/kem: failed to encapsulate: " + err.Error())

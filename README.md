@@ -1,4 +1,31 @@
-### nyquist - A Noise Protocol Framework implementation
+### nyquist - nyquist fork - A Noise Protocol Framework implementation
+
+
+## What's the forking difference?
+
+This is a fork of Yawning Angel's Nyquist, a golang Noise protocol library.
+Specifically, this is forked from the "experimental/pqnoise" branch:
+
+https://gitlab.com/yawning/nyquist/-/tree/experimental/pqnoise?ref_type=heads
+
+which was published as the reference implementation of PQ Noise as
+part of their efforts in publishing their PQ Noise paper:
+
+https://eprint.iacr.org/2022/539
+
+**Okay but why fork Nyquist's exerimental pq noise branch?**
+
+This fork let's you use the PQ Noise features with our hpqc cryptography library:
+
+https://github.com/katzenpost/hpqc
+
+hpqc is a powerful cryptography library with a secure KEM combiner, it let's you compose any number of KEMs together.
+
+
+**original README follows**
+
+
+
 #### Yawning Angel (yawning at schwanenlied dot me)
 
 This package implements the [Noise Protocol Framework][1].

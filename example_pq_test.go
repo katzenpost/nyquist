@@ -48,7 +48,7 @@ func TestPQExample(t *testing.T) {
 	require := require.New(t)
 
 	// Protocols can be constructed by parsing a protocol name.
-	protocol, err := NewProtocol("Noise_pqXX_Kyber1024_ChaChaPoly_BLAKE2s")
+	protocol, err := NewProtocol("Noise_pqXX_Kyber768-X25519_ChaChaPoly_BLAKE2s")
 	require.NoError(err, "NewProtocol")
 
 	seecGenRand, err := seec.GenKeyPRPAES(rand.Reader, 256)
@@ -57,14 +57,14 @@ func TestPQExample(t *testing.T) {
 	// Protocols can also be constructed manually.
 	protocol2 := &Protocol{
 		Pattern: pattern.PqXX,
-		KEM:     schemes.ByName("Kyber1024"),
+		KEM:     schemes.ByName("Kyber768-X25519"),
 		Cipher:  cipher.ChaChaPoly,
 		Hash:    hash.BLAKE2s,
 	}
 	require.Equal(protocol, protocol2)
 
 	// Each side needs a HandshakeConfig, properly filled out.
-	_, aliceStatic := kem.GenerateKeypair(schemes.ByName("Kyber1024"), seecGenRand)
+	_, aliceStatic := kem.GenerateKeypair(schemes.ByName("Kyber768-X25519"), seecGenRand)
 	aliceCfg := &HandshakeConfig{
 		Protocol: protocol,
 		KEM: &KEMConfig{
@@ -74,7 +74,7 @@ func TestPQExample(t *testing.T) {
 		IsInitiator: true,
 	}
 
-	_, bobStatic := kem.GenerateKeypair(schemes.ByName("Kyber1024"), seecGenRand)
+	_, bobStatic := kem.GenerateKeypair(schemes.ByName("Kyber768-X25519"), seecGenRand)
 	require.NoError(err, "Generate Bob's static keypair")
 	bobCfg := &HandshakeConfig{
 		Protocol: protocol,

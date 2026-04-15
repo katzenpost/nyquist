@@ -4,7 +4,6 @@ go 1.26.2
 
 require (
 	github.com/katzenpost/hpqc v0.0.76
-	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a
 	github.com/oasisprotocol/deoxysii v0.0.0-20220228165953-2091330c22b7
 	github.com/rfjakob/eme v1.1.2
 	github.com/stretchr/testify v1.8.4

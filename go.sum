@@ -5,14 +5,12 @@ filippo.io/mlkem768 v0.0.0-20260214141301-2e7bebc7d88d/go.mod h1:ym4egWKLpazdho3
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/go-faster/xor v1.0.0 h1:2o8vTOgErSGHP3/7XwA5ib1FTtUsNtwCoLLBjl31X38=
-github.com/go-faster/xor v1.0.0/go.mod h1:x5CaDY9UKErKzqfRfFZdfu+OSTfoZny3w5Ak7UxcipQ=
 github.com/katzenpost/chacha20 v0.0.1 h1:Scu6Pqyginw083FhypKMIBmCI2gQTC1RFD6vqpWwI2Y=
 github.com/katzenpost/chacha20 v0.0.1/go.mod h1:/LIJK/8cUXVJrCh5NypZ8So3gDfQCoQT8lRvy1rYQZA=
 github.com/katzenpost/circl v1.3.8-0.20260413165442-e2d217fd59f5 h1:n+9aUwSmnz97MNS9duYeHSq+s42CG9wydFECOjqAI9A=
 github.com/katzenpost/circl v1.3.8-0.20260413165442-e2d217fd59f5/go.mod h1:9KxLMK17ZLjofnmpVp4Sm315uIF3BAWHVk32EFDRicU=
-github.com/katzenpost/hpqc v0.0.76 h1:ZhUkvbSJnLDQt9URJVNo6CuzFl1GIheNG4rAzom1kdM=
-github.com/katzenpost/hpqc v0.0.76/go.mod h1:A9ftm1U7h1pTbhFqP/Scp1CnGN6YkK5UXWtWQVKEgPU=
+github.com/katzenpost/hpqc v0.0.78 h1:SJcrDvdS4gUh1hQuDEHDMSjg72brpJh8ySe4N3tJqkQ=
+github.com/katzenpost/hpqc v0.0.78/go.mod h1:A9ftm1U7h1pTbhFqP/Scp1CnGN6YkK5UXWtWQVKEgPU=
 github.com/katzenpost/sntrup4591761 v0.0.0-20231024131303-8755eb1986b8 h1:TsKxH0x2RUwf5rBw67k15bqVM3oVbexA9oaTZQLIy3Y=
 github.com/katzenpost/sntrup4591761 v0.0.0-20231024131303-8755eb1986b8/go.mod h1:Hmcrwom7jcEmGdo0CsyuJNnldPeyS+M07FuCbo7I8fw=
 github.com/mattn/go-pointer v0.0.1 h1:n+XhsuGeVO6MEAp7xyEukFINEa+Quek5psIR/ylA6o0=

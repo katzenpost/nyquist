@@ -34,6 +34,8 @@ import (
 
 	"golang.org/x/crypto/hkdf"
 
+	"github.com/katzenpost/hpqc/util"
+
 	"github.com/katzenpost/nyquist/cipher"
 	"github.com/katzenpost/nyquist/hash"
 )
@@ -76,10 +78,12 @@ func (ss *SymmetricState) InitializeSymmetric(protocolName []byte) {
 // the encapsulated CipherState's key with the output.
 func (ss *SymmetricState) MixKey(inputKeyMaterial []byte) {
 	tempK := make([]byte, ss.hashLen)
+	// InitializeKey copies the key in, so the HKDF output backing
+	// array can be wiped once it has been consumed (forward secrecy).
+	defer util.ExplicitBzero(tempK)
 
 	ss.hkdfHash(inputKeyMaterial, ss.ck, tempK)
-	tempK = truncateTo32BytesMax(tempK)
-	ss.cs.InitializeKey(tempK)
+	ss.cs.InitializeKey(truncateTo32BytesMax(tempK))
 }
 
 // MixHash mixes the provided data with the handshake hash.
@@ -94,11 +98,12 @@ func (ss *SymmetricState) MixHash(data []byte) {
 // the handshake and initializes the encapsulated CipherState with the output.
 func (ss *SymmetricState) MixKeyAndHash(inputKeyMaterial []byte) {
 	tempH, tempK := make([]byte, ss.hashLen), make([]byte, ss.hashLen)
+	defer util.ExplicitBzero(tempH)
+	defer util.ExplicitBzero(tempK)
 
 	ss.hkdfHash(inputKeyMaterial, ss.ck, tempH, tempK)
 	ss.MixHash(tempH)
-	tempK = truncateTo32BytesMax(tempK)
-	ss.cs.InitializeKey(tempK)
+	ss.cs.InitializeKey(truncateTo32BytesMax(tempK))
 }
 
 // GetHandshakeHash returns the handshake hash `h`.
@@ -136,14 +141,14 @@ func (ss *SymmetricState) DecryptAndHash(dst, ciphertext []byte) ([]byte, error)
 // Split returns a pair of CipherState objects for encrypted transport messages.
 func (ss *SymmetricState) Split() (*CipherState, *CipherState) {
 	tempK1, tempK2 := make([]byte, ss.hashLen), make([]byte, ss.hashLen)
+	defer util.ExplicitBzero(tempK1)
+	defer util.ExplicitBzero(tempK2)
 
 	ss.hkdfHash(nil, tempK1, tempK2)
-	tempK1 = truncateTo32BytesMax(tempK1)
-	tempK2 = truncateTo32BytesMax(tempK2)
 
 	c1, c2 := newCipherState(ss.cipher, ss.cs.maxMessageSize), newCipherState(ss.cipher, ss.cs.maxMessageSize)
-	c1.InitializeKey(tempK1)
-	c2.InitializeKey(tempK2)
+	c1.InitializeKey(truncateTo32BytesMax(tempK1))
+	c2.InitializeKey(truncateTo32BytesMax(tempK2))
 
 	return c1, c2
 }
@@ -182,6 +187,9 @@ func (ss *SymmetricState) hkdfHash(inputKeyMaterial []byte, outputs ...[]byte) {
 // `GetHandshakeHash`.
 func (ss *SymmetricState) Reset() {
 	if ss.ck != nil {
+		// Wipe the chaining key before dropping it. ss.h is
+		// deliberately left intact (see the warning above).
+		util.ExplicitBzero(ss.ck)
 		ss.ck = nil
 	}
 	if ss.cs != nil {

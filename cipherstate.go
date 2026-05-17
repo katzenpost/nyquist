@@ -34,6 +34,8 @@ import (
 	"errors"
 	"math"
 
+	"github.com/katzenpost/hpqc/util"
+
 	"github.com/katzenpost/nyquist/cipher"
 )
 
@@ -187,6 +189,10 @@ func (cs *CipherState) Rekey() error {
 // Reset sets the CipherState to a un-keyed state.
 func (cs *CipherState) Reset() {
 	if cs.k != nil {
+		// Wipe the symmetric key bytes before dropping the slice so
+		// they do not linger in freed memory for a later
+		// memory-disclosure adversary (forward secrecy).
+		util.ExplicitBzero(cs.k)
 		cs.k = nil
 	}
 	if cs.aead != nil {

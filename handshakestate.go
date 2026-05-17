@@ -390,6 +390,22 @@ func (hs *HandshakeState) Reset() {
 			hs.dh.e.DropPrivate()
 		}
 	}
+	if hs.cfg.KEM != nil && hs.kem != nil {
+		// Drop references to the KEM private keys (unless they were
+		// supplied by the config) so the ephemeral, on which forward
+		// secrecy depends, becomes unreachable and collectable once
+		// the session keys are derived. The kem.PrivateKey interface
+		// exposes no in-place wipe (unlike dh.PrivateKey.DropPrivate),
+		// so a memory-zeroing drop would need an hpqc-level primitive;
+		// dropping the reference is the strongest action available
+		// here.
+		if hs.kem.s != nil && hs.kem.s != hs.cfg.KEM.LocalStatic {
+			hs.kem.s = nil
+		}
+		if hs.kem.e != nil && hs.kem.e != hs.cfg.KEM.LocalEphemeral {
+			hs.kem.e = nil
+		}
+	}
 	// TODO: Should this set hs.status.Err?
 }
 

@@ -33,6 +33,7 @@ package kem // import "github.com/katzenpost/nyquist/kem"
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/katzenpost/hpqc/kem"
 
@@ -56,8 +57,12 @@ func GenerateKeypair(scheme kem.Scheme, genRand seec.GenRand) (kem.PublicKey, ke
 func Enc(genRand seec.GenRand, pubTo kem.PublicKey) ([]byte, []byte, error) {
 	ct, ss, err := pubTo.Scheme().Encapsulate(pubTo)
 	if err != nil {
-		// This should NEVER happen.
-		panic("nyquist/kem: failed to encapsulate: " + err.Error())
+		// Peer-supplied public keys reach this path (the s/rs
+		// tokens of a KEM handshake). The hybrid combiner returns
+		// real errors for a structurally-valid-but-wrong key, so
+		// this is reachable from the network and must not panic;
+		// return the error and let the caller abort the handshake.
+		return nil, nil, fmt.Errorf("nyquist/kem: failed to encapsulate: %w", err)
 	}
 	return ct, ss, nil
 }
@@ -69,10 +74,14 @@ func Dec(privateKey kem.PrivateKey, ciphertext []byte) ([]byte, error) {
 
 	ss, err := privateKey.Scheme().Decapsulate(privateKey, ciphertext)
 	if err != nil {
-		// This should NEVER happen, all KEMs that are currently still
-		// in the NIST competition return a deterministic random value
-		// on decapsulation failure.
-		panic("nyquist/kem: failed to decapsulate: " + err.Error())
+		// The "deterministic value on failure" property holds only
+		// for the implicit-rejection ML-KEM core, not for the
+		// surrounding hybrid combiner: its size/type checks and the
+		// X25519 adapter's point parse return real errors on
+		// attacker-supplied ciphertext. This is reachable from the
+		// network and must not panic; return the error so the caller
+		// aborts the handshake cleanly.
+		return nil, fmt.Errorf("nyquist/kem: failed to decapsulate: %w", err)
 	}
 
 	return ss, nil
